@@ -1,0 +1,1998 @@
+{
+ "games (schedule)": {
+  "id": 401520277,
+  "season": 2023,
+  "week": 5,
+  "seasonType": "regular",
+  "startDate": "2023-09-28T23:30:00.000Z",
+  "startTimeTBD": false,
+  "completed": true,
+  "neutralSite": false,
+  "conferenceGame": true,
+  "attendance": 14712,
+  "venueId": 3796,
+  "venue": "Houchens Industries-L.T. Smith Stadium",
+  "homeId": 98,
+  "homeTeam": "Western Kentucky",
+  "homeClassification": "fbs",
+  "homeConference": "Conference USA",
+  "homePoints": 31,
+  "homeLineScores": [
+   10,
+   13,
+   0,
+   8
+  ],
+  "homePostgameWinProbability": 0.9711182713508606,
+  "homePregameElo": 1506,
+  "homePostgameElo": 1537,
+  "awayId": 2393,
+  "awayTeam": "Middle Tennessee",
+  "awayClassification": "fbs",
+  "awayConference": "Conference USA",
+  "awayPoints": 10,
+  "awayLineScores": [
+   0,
+   3,
+   7,
+   0
+  ],
+  "awayPostgameWinProbability": 0.028881728649139404,
+  "awayPregameElo": 1320,
+  "awayPostgameElo": 1289,
+  "excitementIndex": 3.4153076323376075,
+  "highlights": "",
+  "notes": null,
+  "playoff": null
+ },
+ "games/players": {
+  "id": 401539996,
+  "teams": [
+   {
+    "team": "North Carolina Central",
+    "conference": "MEAC",
+    "homeAway": "home",
+    "points": 49,
+    "categories": [
+     {
+      "name": "passing",
+      "types": [
+       {
+        "name": "C/ATT",
+        "athletes": [
+         {
+          "id": "4576064",
+          "name": "Davius Richard",
+          "stat": "21/34"
+         },
+         {
+          "id": "-6818",
+          "name": " Team",
+          "stat": "0/1"
+         }
+        ]
+       },
+       {
+        "name": "YDS",
+        "athletes": [
+         {
+          "id": "4576064",
+          "name": "Davius Richard",
+          "stat": "265"
+         },
+         {
+          "id": "-6818",
+          "name": " Team",
+          "stat": "0"
+         }
+        ]
+       },
+       {
+        "name": "AVG",
+        "athletes": [
+         {
+          "id": "4576064",
+          "name": "Davius Richard",
+          "stat": "7.8"
+         },
+         {
+          "id": "-6818",
+          "name": " Team",
+          "stat": "0.0"
+         }
+        ]
+       },
+       {
+        "name": "TD",
+        "athletes": [
+         {
+          "id": "4576064",
+          "name": "Davius Richard",
+          "stat": "1"
+         },
+         {
+          "id": "-6818",
+          "name": " Team",
+          "stat": "0"
+         }
+        ]
+       },
+       {
+        "name": "INT",
+        "athletes": [
+         {
+          "id": "4576064",
+          "name": "Davius Richard",
+          "stat": "0"
+         },
+         {
+          "id": "-6818",
+          "name": " Team",
+          "stat": "0"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "name": "rushing",
+      "types": [
+       {
+        "name": "CAR",
+        "athletes": [
+         {
+          "id": "4576064",
+          "name": "Davius Richard",
+          "stat": "21"
+         },
+         {
+          "id": "4576073",
+          "name": "Latrell Collier",
+          "stat": "17"
+         },
+         {
+          "id": "4713118",
+          "name": "J'mari Taylor",
+          "stat": "7"
+         }
+        ]
+       },
+       {
+        "name": "YDS",
+        "athletes": [
+         {
+          "id": "4576064",
+          "name": "Davius Richard",
+          "stat": "86"
+         },
+         {
+          "id": "4576073",
+          "name": "Latrell Collier",
+          "stat": "77"
+         },
+         {
+          "id": "4713118",
+          "name": "J'mari Taylor",
+          "stat": "19"
+         }
+        ]
+       },
+       {
+        "name": "AVG",
+        "athletes": [
+         {
+          "id": "4576064",
+          "name": "Davius Richard",
+          "stat": "4.1"
+         },
+         {
+          "id": "4576073",
+          "name": "Latrell Collier",
+          "stat": "4.5"
+         },
+         {
+          "id": "4713118",
+          "name": "J'mari Taylor",
+          "stat": "2.7"
+         }
+        ]
+       },
+       {
+        "name": "TD",
+        "athletes": [
+         {
+          "id": "4576064",
+          "name": "Davius Richard",
+          "stat": "4"
+         },
+         {
+          "id": "4576073",
+          "name": "Latrell Collier",
+          "stat": "2"
+         },
+         {
+          "id": "4713118",
+          "name": "J'mari Taylor",
+          "stat": "0"
+         }
+        ]
+       },
+       {
+        "name": "LONG",
+        "athletes": [
+         {
+          "id": "4576064",
+          "name": "Davius Richard",
+          "stat": "17"
+         },
+         {
+          "id": "4576073",
+          "name": "Latrell Collier",
+          "stat": "25"
+         },
+         {
+          "id": "4713118",
+          "name": "J'mari Taylor",
+          "stat": "12"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "name": "receiving",
+      "types": [
+       {
+        "name": "REC",
+        "athletes": [
+         {
+          "id": "4696883",
+          "name": "Devin Smith",
+          "stat": "5"
+         },
+         {
+          "id": "4713118",
+          "name": "J'mari Taylor",
+          "stat": "4"
+         },
+         {
+          "id": "4696907",
+          "name": "Joaquin Davis",
+          "stat": "3"
+         },
+         {
+          "id": "4879121",
+          "name": "Quentin McCall",
+          "stat": "2"
+         },
+         {
+          "id": "5095835",
+          "name": "Chauncey Spikes",
+          "stat": "2"
+         },
+         {
+          "id": "4576073",
+          "name": "Latrell Collier",
+          "stat": "4"
+         },
+         {
+          "id": "5095834",
+          "name": "Luke Bracey",
+          "stat": "1"
+         }
+        ]
+       },
+       {
+        "name": "YDS",
+        "athletes": [
+         {
+          "id": "4696883",
+          "name": "Devin Smith",
+          "stat": "90"
+         },
+         {
+          "id": "4713118",
+          "name": "J'mari Taylor",
+          "stat": "57"
+         },
+         {
+          "id": "4696907",
+          "name": "Joaquin Davis",
+          "stat": "42"
+         },
+         {
+          "id": "4879121",
+          "name": "Quentin McCall",
+          "stat": "29"
+         },
+         {
+          "id": "5095835",
+          "name": "Chauncey Spikes",
+          "stat": "25"
+         },
+         {
+          "id": "4576073",
+          "name": "Latrell Collier",
+          "stat": "19"
+         },
+         {
+          "id": "5095834",
+          "name": "Luke Bracey",
+          "stat": "3"
+         }
+        ]
+       },
+       {
+        "name": "AVG",
+        "athletes": [
+         {
+          "id": "4696883",
+          "name": "Devin Smith",
+          "stat": "18.0"
+         },
+         {
+          "id": "4713118",
+          "name": "J'mari Taylor",
+          "stat": "14.3"
+         },
+         {
+          "id": "4696907",
+          "name": "Joaquin Davis",
+          "stat": "14.0"
+         },
+         {
+          "id": "4879121",
+          "name": "Quentin McCall",
+          "stat": "14.5"
+         },
+         {
+          "id": "5095835",
+          "name": "Chauncey Spikes",
+          "stat": "12.5"
+         },
+         {
+          "id": "4576073",
+          "name": "Latrell Collier",
+          "stat": "4.8"
+         },
+         {
+          "id": "5095834",
+          "name": "Luke Bracey",
+          "stat": "3.0"
+         }
+        ]
+       },
+       {
+        "name": "TD",
+        "athletes": [
+         {
+          "id": "4696883",
+          "name": "Devin Smith",
+          "stat": "0"
+         },
+         {
+          "id": "4713118",
+          "name": "J'mari Taylor",
+          "stat": "0"
+         },
+         {
+          "id": "4696907",
+          "name": "Joaquin Davis",
+          "stat": "0"
+         },
+         {
+          "id": "4879121",
+          "name": "Quentin McCall",
+          "stat": "0"
+         },
+         {
+          "id": "5095835",
+          "name": "Chauncey Spikes",
+          "stat": "0"
+         },
+         {
+          "id": "4576073",
+          "name": "Latrell Collier",
+          "stat": "0"
+         },
+         {
+          "id": "5095834",
+          "name": "Luke Bracey",
+          "stat": "1"
+         }
+        ]
+       },
+       {
+        "name": "LONG",
+        "athletes": [
+         {
+          "id": "4696883",
+          "name": "Devin Smith",
+          "stat": "51"
+         },
+         {
+          "id": "4713118",
+          "name": "J'mari Taylor",
+          "stat": "23"
+         },
+         {
+          "id": "4696907",
+          "name": "Joaquin Davis",
+          "stat": "31"
+         },
+         {
+          "id": "4879121",
+          "name": "Quentin McCall",
+          "stat": "26"
+         },
+         {
+          "id": "5095835",
+          "name": "Chauncey Spikes",
+          "stat": "16"
+         },
+         {
+          "id": "4576073",
+          "name": "Latrell Collier",
+          "stat": "7"
+         },
+         {
+          "id": "5095834",
+          "name": "Luke Bracey",
+          "stat": "3"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "name": "fumbles",
+      "types": [
+       {
+        "name": "FUM",
+        "athletes": [
+         {
+          "id": "4576064",
+          "name": "Davius Richard",
+          "stat": "1"
+         },
+         {
+          "id": "4713118",
+          "name": "J'mari Taylor",
+          "stat": "1"
+         }
+        ]
+       },
+       {
+        "name": "LOST",
+        "athletes": [
+         {
+          "id": "4576064",
+          "name": "Davius Richard",
+          "stat": "0"
+         },
+         {
+          "id": "4713118",
+          "name": "J'mari Taylor",
+          "stat": "0"
+         }
+        ]
+       },
+       {
+        "name": "REC",
+        "athletes": [
+         {
+          "id": "4576064",
+          "name": "Davius Richard",
+          "stat": "0"
+         },
+         {
+          "id": "4713118",
+          "name": "J'mari Taylor",
+          "stat": "0"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "name": "interceptions",
+      "types": [
+       {
+        "name": "INT",
+        "athletes": [
+         {
+          "id": "5095810",
+          "name": "Jason Chambers",
+          "stat": "1"
+         }
+        ]
+       },
+       {
+        "name": "YDS",
+        "athletes": [
+         {
+          "id": "5095810",
+          "name": "Jason Chambers",
+          "stat": "19"
+         }
+        ]
+       },
+       {
+        "name": "TD",
+        "athletes": [
+         {
+          "id": "5095810",
+          "name": "Jason Chambers",
+          "stat": "0"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "name": "kickReturns",
+      "types": [
+       {
+        "name": "NO",
+        "athletes": [
+         {
+          "id": "4576069",
+          "name": "Brandon Codrington",
+          "stat": "2"
+         },
+         {
+          "id": "4713118",
+          "name": "J'mari Taylor",
+          "stat": "1"
+         }
+        ]
+       },
+       {
+        "name": "YDS",
+        "athletes": [
+         {
+          "id": "4576069",
+          "name": "Brandon Codrington",
+          "stat": "47"
+         },
+         {
+          "id": "4713118",
+          "name": "J'mari Taylor",
+          "stat": "1"
+         }
+        ]
+       },
+       {
+        "name": "AVG",
+        "athletes": [
+         {
+          "id": "4576069",
+          "name": "Brandon Codrington",
+          "stat": "23.5"
+         },
+         {
+          "id": "4713118",
+          "name": "J'mari Taylor",
+          "stat": "1.0"
+         }
+        ]
+       },
+       {
+        "name": "LONG",
+        "athletes": [
+         {
+          "id": "4576069",
+          "name": "Brandon Codrington",
+          "stat": "25"
+         },
+         {
+          "id": "4713118",
+          "name": "J'mari Taylor",
+          "stat": "1"
+         }
+        ]
+       },
+       {
+        "name": "TD",
+        "athletes": [
+         {
+          "id": "4576069",
+          "name": "Brandon Codrington",
+          "stat": "0"
+         },
+         {
+          "id": "4713118",
+          "name": "J'mari Taylor",
+          "stat": "0"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "name": "puntReturns",
+      "types": [
+       {
+        "name": "NO",
+        "athletes": [
+         {
+          "id": "4576069",
+          "name": "Brandon Codrington",
+          "stat": "2"
+         }
+        ]
+       },
+       {
+        "name": "YDS",
+        "athletes": [
+         {
+          "id": "4576069",
+          "name": "Brandon Codrington",
+          "stat": "22"
+         }
+        ]
+       },
+       {
+        "name": "AVG",
+        "athletes": [
+         {
+          "id": "4576069",
+          "name": "Brandon Codrington",
+          "stat": "11.0"
+         }
+        ]
+       },
+       {
+        "name": "LONG",
+        "athletes": [
+         {
+          "id": "4576069",
+          "name": "Brandon Codrington",
+          "stat": "13"
+         }
+        ]
+       },
+       {
+        "name": "TD",
+        "athletes": [
+         {
+          "id": "4576069",
+          "name": "Brandon Codrington",
+          "stat": "0"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "name": "kicking",
+      "types": [
+       {
+        "name": "FG",
+        "athletes": [
+         {
+          "id": "4578458",
+          "name": "Adrian Olivo",
+          "stat": "0/0"
+         }
+        ]
+       },
+       {
+        "name": "PCT",
+        "athletes": [
+         {
+          "id": "4578458",
+          "name": "Adrian Olivo",
+          "stat": "0.0"
+         }
+        ]
+       },
+       {
+        "name": "LONG",
+        "athletes": [
+         {
+          "id": "4578458",
+          "name": "Adrian Olivo",
+          "stat": "0"
+         }
+        ]
+       },
+       {
+        "name": "XP",
+        "athletes": [
+         {
+          "id": "4578458",
+          "name": "Adrian Olivo",
+          "stat": "7/7"
+         }
+        ]
+       },
+       {
+        "name": "PTS",
+        "athletes": [
+         {
+          "id": "4578458",
+          "name": "Adrian Olivo",
+          "stat": "7"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "name": "punting",
+      "types": [
+       {
+        "name": "NO",
+        "athletes": [
+         {
+          "id": "4696896",
+          "name": "Juan Velarde",
+          "stat": "3"
+         }
+        ]
+       },
+       {
+        "name": "YDS",
+        "athletes": [
+         {
+          "id": "4696896",
+          "name": "Juan Velarde",
+          "stat": "132"
+         }
+        ]
+       },
+       {
+        "name": "AVG",
+        "athletes": [
+         {
+          "id": "4696896",
+          "name": "Juan Velarde",
+          "stat": "44.0"
+         }
+        ]
+       },
+       {
+        "name": "TB",
+        "athletes": [
+         {
+          "id": "4696896",
+          "name": "Juan Velarde",
+          "stat": "2"
+         }
+        ]
+       },
+       {
+        "name": "In 20",
+        "athletes": [
+         {
+          "id": "4696896",
+          "name": "Juan Velarde",
+          "stat": "1"
+         }
+        ]
+       },
+       {
+        "name": "LONG",
+        "athletes": [
+         {
+          "id": "4696896",
+          "name": "Juan Velarde",
+          "stat": "47"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "team": "Campbell",
+    "conference": "Coastal Athletic",
+    "homeAway": "away",
+    "points": 48,
+    "categories": [
+     {
+      "name": "passing",
+      "types": [
+       {
+        "name": "C/ATT",
+        "athletes": [
+         {
+          "id": "4571364",
+          "name": "Hajj-Malik Williams",
+          "stat": "20/26"
+         }
+        ]
+       },
+       {
+        "name": "YDS",
+        "athletes": [
+         {
+          "id": "4571364",
+          "name": "Hajj-Malik Williams",
+          "stat": "302"
+         }
+        ]
+       },
+       {
+        "name": "AVG",
+        "athletes": [
+         {
+          "id": "4571364",
+          "name": "Hajj-Malik Williams",
+          "stat": "11.6"
+         }
+        ]
+       },
+       {
+        "name": "TD",
+        "athletes": [
+         {
+          "id": "4571364",
+          "name": "Hajj-Malik Williams",
+          "stat": "5"
+         }
+        ]
+       },
+       {
+        "name": "INT",
+        "athletes": [
+         {
+          "id": "4571364",
+          "name": "Hajj-Malik Williams",
+          "stat": "1"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "name": "rushing",
+      "types": [
+       {
+        "name": "CAR",
+        "athletes": [
+         {
+          "id": "5086050",
+          "name": "NaQuari Rogers",
+          "stat": "14"
+         },
+         {
+          "id": "4691838",
+          "name": "Lamagea McDowell",
+          "stat": "8"
+         },
+         {
+          "id": "4571364",
+          "name": "Hajj-Malik Williams",
+          "stat": "4"
+         }
+        ]
+       },
+       {
+        "name": "YDS",
+        "athletes": [
+         {
+          "id": "5086050",
+          "name": "NaQuari Rogers",
+          "stat": "57"
+         },
+         {
+          "id": "4691838",
+          "name": "Lamagea McDowell",
+          "stat": "34"
+         },
+         {
+          "id": "4571364",
+          "name": "Hajj-Malik Williams",
+          "stat": "17"
+         }
+        ]
+       },
+       {
+        "name": "AVG",
+        "athletes": [
+         {
+          "id": "5086050",
+          "name": "NaQuari Rogers",
+          "stat": "4.1"
+         },
+         {
+          "id": "4691838",
+          "name": "Lamagea McDowell",
+          "stat": "4.3"
+         },
+         {
+          "id": "4571364",
+          "name": "Hajj-Malik Williams",
+          "stat": "4.3"
+         }
+        ]
+       },
+       {
+        "name": "TD",
+        "athletes": [
+         {
+          "id": "5086050",
+          "name": "NaQuari Rogers",
+          "stat": "1"
+         },
+         {
+          "id": "4691838",
+          "name": "Lamagea McDowell",
+          "stat": "0"
+         },
+         {
+          "id": "4571364",
+          "name": "Hajj-Malik Williams",
+          "stat": "0"
+         }
+        ]
+       },
+       {
+        "name": "LONG",
+        "athletes": [
+         {
+          "id": "5086050",
+          "name": "NaQuari Rogers",
+          "stat": "17"
+         },
+         {
+          "id": "4691838",
+          "name": "Lamagea McDowell",
+          "stat": "11"
+         },
+         {
+          "id": "4571364",
+          "name": "Hajj-Malik Williams",
+          "stat": "17"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "name": "receiving",
+      "types": [
+       {
+        "name": "REC",
+        "athletes": [
+         {
+          "id": "4571336",
+          "name": "Jalen Kelsey",
+          "stat": "7"
+         },
+         {
+          "id": "4426570",
+          "name": "Ezeriah Anderson",
+          "stat": "3"
+         },
+         {
+          "id": "5086051",
+          "name": "Vincent Wilkins",
+          "stat": "4"
+         },
+         {
+          "id": "5086052",
+          "name": "Chaney Fitzgerald",
+          "stat": "2"
+         },
+         {
+          "id": "4876533",
+          "name": "RJ Jackson",
+          "stat": "1"
+         },
+         {
+          "id": "4691838",
+          "name": "Lamagea McDowell",
+          "stat": "1"
+         },
+         {
+          "id": "5157119",
+          "name": "Aiden Valdez",
+          "stat": "1"
+         },
+         {
+          "id": "5086050",
+          "name": "NaQuari Rogers",
+          "stat": "1"
+         }
+        ]
+       },
+       {
+        "name": "YDS",
+        "athletes": [
+         {
+          "id": "4571336",
+          "name": "Jalen Kelsey",
+          "stat": "172"
+         },
+         {
+          "id": "4426570",
+          "name": "Ezeriah Anderson",
+          "stat": "47"
+         },
+         {
+          "id": "5086051",
+          "name": "Vincent Wilkins",
+          "stat": "28"
+         },
+         {
+          "id": "5086052",
+          "name": "Chaney Fitzgerald",
+          "stat": "16"
+         },
+         {
+          "id": "4876533",
+          "name": "RJ Jackson",
+          "stat": "15"
+         },
+         {
+          "id": "4691838",
+          "name": "Lamagea McDowell",
+          "stat": "11"
+         },
+         {
+          "id": "5157119",
+          "name": "Aiden Valdez",
+          "stat": "11"
+         },
+         {
+          "id": "5086050",
+          "name": "NaQuari Rogers",
+          "stat": "2"
+         }
+        ]
+       },
+       {
+        "name": "AVG",
+        "athletes": [
+         {
+          "id": "4571336",
+          "name": "Jalen Kelsey",
+          "stat": "24.6"
+         },
+         {
+          "id": "4426570",
+          "name": "Ezeriah Anderson",
+          "stat": "15.7"
+         },
+         {
+          "id": "5086051",
+          "name": "Vincent Wilkins",
+          "stat": "7.0"
+         },
+         {
+          "id": "5086052",
+          "name": "Chaney Fitzgerald",
+          "stat": "8.0"
+         },
+         {
+          "id": "4876533",
+          "name": "RJ Jackson",
+          "stat": "15.0"
+         },
+         {
+          "id": "4691838",
+          "name": "Lamagea McDowell",
+          "stat": "11.0"
+         },
+         {
+          "id": "5157119",
+          "name": "Aiden Valdez",
+          "stat": "11.0"
+         },
+         {
+          "id": "5086050",
+          "name": "NaQuari Rogers",
+          "stat": "2.0"
+         }
+        ]
+       },
+       {
+        "name": "TD",
+        "athletes": [
+         {
+          "id": "4571336",
+          "name": "Jalen Kelsey",
+          "stat": "2"
+         },
+         {
+          "id": "4426570",
+          "name": "Ezeriah Anderson",
+          "stat": "1"
+         },
+         {
+          "id": "5086051",
+          "name": "Vincent Wilkins",
+          "stat": "1"
+         },
+         {
+          "id": "5086052",
+          "name": "Chaney Fitzgerald",
+          "stat": "0"
+         },
+         {
+          "id": "4876533",
+          "name": "RJ Jackson",
+          "stat": "0"
+         },
+         {
+          "id": "4691838",
+          "name": "Lamagea McDowell",
+          "stat": "1"
+         },
+         {
+          "id": "5157119",
+          "name": "Aiden Valdez",
+          "stat": "0"
+         },
+         {
+          "id": "5086050",
+          "name": "NaQuari Rogers",
+          "stat": "0"
+         }
+        ]
+       },
+       {
+        "name": "LONG",
+        "athletes": [
+         {
+          "id": "4571336",
+          "name": "Jalen Kelsey",
+          "stat": "70"
+         },
+         {
+          "id": "4426570",
+          "name": "Ezeriah Anderson",
+          "stat": "30"
+         },
+         {
+          "id": "5086051",
+          "name": "Vincent Wilkins",
+          "stat": "12"
+         },
+         {
+          "id": "5086052",
+          "name": "Chaney Fitzgerald",
+          "stat": "8"
+         },
+         {
+          "id": "4876533",
+          "name": "RJ Jackson",
+          "stat": "15"
+         },
+         {
+          "id": "4691838",
+          "name": "Lamagea McDowell",
+          "stat": "11"
+         },
+         {
+          "id": "5157119",
+          "name": "Aiden Valdez",
+          "stat": "11"
+         },
+         {
+          "id": "5086050",
+          "name": "NaQuari Rogers",
+          "stat": "2"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "name": "fumbles",
+      "types": [
+       {
+        "name": "FUM",
+        "athletes": [
+         {
+          "id": "4691838",
+          "name": "Lamagea McDowell",
+          "stat": "1"
+         },
+         {
+          "id": "5086050",
+          "name": "NaQuari Rogers",
+          "stat": "1"
+         }
+        ]
+       },
+       {
+        "name": "LOST",
+        "athletes": [
+         {
+          "id": "4691838",
+          "name": "Lamagea McDowell",
+          "stat": "0"
+         },
+         {
+          "id": "5086050",
+          "name": "NaQuari Rogers",
+          "stat": "0"
+         }
+        ]
+       },
+       {
+        "name": "REC",
+        "athletes": [
+         {
+          "id": "4691838",
+          "name": "Lamagea McDowell",
+          "stat": "0"
+         },
+         {
+          "id": "5086050",
+          "name": "NaQuari Rogers",
+          "stat": "0"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "name": "kickReturns",
+      "types": [
+       {
+        "name": "NO",
+        "athletes": [
+         {
+          "id": "5086051",
+          "name": "Vincent Wilkins",
+          "stat": "4"
+         },
+         {
+          "id": "4691842",
+          "name": "Chris McKay Jr.",
+          "stat": "1"
+         }
+        ]
+       },
+       {
+        "name": "YDS",
+        "athletes": [
+         {
+          "id": "5086051",
+          "name": "Vincent Wilkins",
+          "stat": "71"
+         },
+         {
+          "id": "4691842",
+          "name": "Chris McKay Jr.",
+          "stat": "19"
+         }
+        ]
+       },
+       {
+        "name": "AVG",
+        "athletes": [
+         {
+          "id": "5086051",
+          "name": "Vincent Wilkins",
+          "stat": "17.8"
+         },
+         {
+          "id": "4691842",
+          "name": "Chris McKay Jr.",
+          "stat": "19.0"
+         }
+        ]
+       },
+       {
+        "name": "LONG",
+        "athletes": [
+         {
+          "id": "5086051",
+          "name": "Vincent Wilkins",
+          "stat": "28"
+         },
+         {
+          "id": "4691842",
+          "name": "Chris McKay Jr.",
+          "stat": "19"
+         }
+        ]
+       },
+       {
+        "name": "TD",
+        "athletes": [
+         {
+          "id": "5086051",
+          "name": "Vincent Wilkins",
+          "stat": "0"
+         },
+         {
+          "id": "4691842",
+          "name": "Chris McKay Jr.",
+          "stat": "0"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "name": "puntReturns",
+      "types": [
+       {
+        "name": "NO",
+        "athletes": [
+         {
+          "id": "4429038",
+          "name": "Trevon Booker",
+          "stat": "1"
+         },
+         {
+          "id": "4571353",
+          "name": "Tai Goode",
+          "stat": "0"
+         }
+        ]
+       },
+       {
+        "name": "YDS",
+        "athletes": [
+         {
+          "id": "4429038",
+          "name": "Trevon Booker",
+          "stat": "18"
+         },
+         {
+          "id": "4571353",
+          "name": "Tai Goode",
+          "stat": "16"
+         }
+        ]
+       },
+       {
+        "name": "AVG",
+        "athletes": [
+         {
+          "id": "4429038",
+          "name": "Trevon Booker",
+          "stat": "18.0"
+         },
+         {
+          "id": "4571353",
+          "name": "Tai Goode",
+          "stat": "0.0"
+         }
+        ]
+       },
+       {
+        "name": "LONG",
+        "athletes": [
+         {
+          "id": "4429038",
+          "name": "Trevon Booker",
+          "stat": "18"
+         },
+         {
+          "id": "4571353",
+          "name": "Tai Goode",
+          "stat": "16"
+         }
+        ]
+       },
+       {
+        "name": "TD",
+        "athletes": [
+         {
+          "id": "4429038",
+          "name": "Trevon Booker",
+          "stat": "0"
+         },
+         {
+          "id": "4571353",
+          "name": "Tai Goode",
+          "stat": "0"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "name": "kicking",
+      "types": [
+       {
+        "name": "FG",
+        "athletes": [
+         {
+          "id": "4370409",
+          "name": "Caleb Dowden",
+          "stat": "0/0"
+         }
+        ]
+       },
+       {
+        "name": "PCT",
+        "athletes": [
+         {
+          "id": "4370409",
+          "name": "Caleb Dowden",
+          "stat": "0.0"
+         }
+        ]
+       },
+       {
+        "name": "LONG",
+        "athletes": [
+         {
+          "id": "4370409",
+          "name": "Caleb Dowden",
+          "stat": "0"
+         }
+        ]
+       },
+       {
+        "name": "XP",
+        "athletes": [
+         {
+          "id": "4370409",
+          "name": "Caleb Dowden",
+          "stat": "6/6"
+         }
+        ]
+       },
+       {
+        "name": "PTS",
+        "athletes": [
+         {
+          "id": "4370409",
+          "name": "Caleb Dowden",
+          "stat": "6"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "name": "punting",
+      "types": [
+       {
+        "name": "NO",
+        "athletes": [
+         {
+          "id": "4574768",
+          "name": "John Brady",
+          "stat": "2"
+         }
+        ]
+       },
+       {
+        "name": "YDS",
+        "athletes": [
+         {
+          "id": "4574768",
+          "name": "John Brady",
+          "stat": "81"
+         }
+        ]
+       },
+       {
+        "name": "AVG",
+        "athletes": [
+         {
+          "id": "4574768",
+          "name": "John Brady",
+          "stat": "40.5"
+         }
+        ]
+       },
+       {
+        "name": "TB",
+        "athletes": [
+         {
+          "id": "4574768",
+          "name": "John Brady",
+          "stat": "0"
+         }
+        ]
+       },
+       {
+        "name": "In 20",
+        "athletes": [
+         {
+          "id": "4574768",
+          "name": "John Brady",
+          "stat": "0"
+         }
+        ]
+       },
+       {
+        "name": "LONG",
+        "athletes": [
+         {
+          "id": "4574768",
+          "name": "John Brady",
+          "stat": "44"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "ppa/players/games": {
+  "season": 2023,
+  "week": 5,
+  "seasonType": "regular",
+  "id": "4249638",
+  "name": "Zion Webb",
+  "position": "QB",
+  "team": "Jacksonville State",
+  "opponent": "Sam Houston",
+  "averagePPA": {
+   "all": -0.44,
+   "pass": -0.83,
+   "rush": 0.144
+  }
+ },
+ "games/teams": {
+  "id": 401540068,
+  "teams": [
+   {
+    "teamId": 107,
+    "team": "Holy Cross",
+    "conference": "Patriot",
+    "homeAway": "home",
+    "points": 28,
+    "stats": [
+     {
+      "category": "rushingTDs",
+      "stat": "0"
+     },
+     {
+      "category": "puntReturnYards",
+      "stat": "-2"
+     },
+     {
+      "category": "puntReturnTDs",
+      "stat": "0"
+     },
+     {
+      "category": "puntReturns",
+      "stat": "1"
+     },
+     {
+      "category": "passingTDs",
+      "stat": "4"
+     },
+     {
+      "category": "kickReturnYards",
+      "stat": "135"
+     },
+     {
+      "category": "kickReturnTDs",
+      "stat": "0"
+     },
+     {
+      "category": "kickReturns",
+      "stat": "6"
+     },
+     {
+      "category": "kickingPoints",
+      "stat": "4"
+     },
+     {
+      "category": "fumblesRecovered",
+      "stat": "0"
+     },
+     {
+      "category": "totalFumbles",
+      "stat": "2"
+     },
+     {
+      "category": "possessionTime",
+      "stat": "26:14"
+     },
+     {
+      "category": "interceptions",
+      "stat": "3"
+     },
+     {
+      "category": "fumblesLost",
+      "stat": "2"
+     },
+     {
+      "category": "turnovers",
+      "stat": "5"
+     },
+     {
+      "category": "totalPenaltiesYards",
+      "stat": "3-31"
+     },
+     {
+      "category": "yardsPerRushAttempt",
+      "stat": "4.1"
+     },
+     {
+      "category": "rushingAttempts",
+      "stat": "36"
+     },
+     {
+      "category": "rushingYards",
+      "stat": "148"
+     },
+     {
+      "category": "yardsPerPass",
+      "stat": "12.3"
+     },
+     {
+      "category": "completionAttempts",
+      "stat": "15-26"
+     },
+     {
+      "category": "netPassingYards",
+      "stat": "320"
+     },
+     {
+      "category": "totalYards",
+      "stat": "468"
+     },
+     {
+      "category": "fourthDownEff",
+      "stat": "3-5"
+     },
+     {
+      "category": "thirdDownEff",
+      "stat": "3-11"
+     },
+     {
+      "category": "firstDowns",
+      "stat": "19"
+     }
+    ]
+   },
+   {
+    "teamId": 108,
+    "team": "Harvard",
+    "conference": "Ivy",
+    "homeAway": "away",
+    "points": 38,
+    "stats": [
+     {
+      "category": "rushingTDs",
+      "stat": "2"
+     },
+     {
+      "category": "passingTDs",
+      "stat": "2"
+     },
+     {
+      "category": "kickReturnYards",
+      "stat": "62"
+     },
+     {
+      "category": "kickReturnTDs",
+      "stat": "0"
+     },
+     {
+      "category": "kickReturns",
+      "stat": "3"
+     },
+     {
+      "category": "kickingPoints",
+      "stat": "8"
+     },
+     {
+      "category": "interceptionYards",
+      "stat": "49"
+     },
+     {
+      "category": "interceptionTDs",
+      "stat": "1"
+     },
+     {
+      "category": "passesIntercepted",
+      "stat": "3"
+     },
+     {
+      "category": "fumblesRecovered",
+      "stat": "2"
+     },
+     {
+      "category": "totalFumbles",
+      "stat": "0"
+     },
+     {
+      "category": "possessionTime",
+      "stat": "33:46"
+     },
+     {
+      "category": "interceptions",
+      "stat": "0"
+     },
+     {
+      "category": "fumblesLost",
+      "stat": "0"
+     },
+     {
+      "category": "turnovers",
+      "stat": "0"
+     },
+     {
+      "category": "totalPenaltiesYards",
+      "stat": "4-35"
+     },
+     {
+      "category": "yardsPerRushAttempt",
+      "stat": "4.3"
+     },
+     {
+      "category": "rushingAttempts",
+      "stat": "49"
+     },
+     {
+      "category": "rushingYards",
+      "stat": "209"
+     },
+     {
+      "category": "yardsPerPass",
+      "stat": "7.6"
+     },
+     {
+      "category": "completionAttempts",
+      "stat": "9-20"
+     },
+     {
+      "category": "netPassingYards",
+      "stat": "151"
+     },
+     {
+      "category": "totalYards",
+      "stat": "360"
+     },
+     {
+      "category": "fourthDownEff",
+      "stat": "2-3"
+     },
+     {
+      "category": "thirdDownEff",
+      "stat": "5-15"
+     },
+     {
+      "category": "firstDowns",
+      "stat": "20"
+     }
+    ]
+   }
+  ]
+ },
+ "stats/game/advanced": {
+  "gameId": 401520276,
+  "season": 2023,
+  "seasonType": "regular",
+  "week": 5,
+  "team": "Jacksonville State",
+  "opponent": "Sam Houston",
+  "offense": {
+   "plays": 66,
+   "drives": 16,
+   "ppa": 0.024106282280783767,
+   "totalPPA": 1.5910146305317285,
+   "successRate": 0.3181818181818182,
+   "explosiveness": 1.6595924234062418,
+   "powerSuccess": 1,
+   "stuffRate": 0.21212121212121213,
+   "lineYards": 2.9424242424242424,
+   "lineYardsTotal": 97,
+   "secondLevelYards": 1.303030303030303,
+   "secondLevelYardsTotal": 43,
+   "openFieldYards": 2.242424242424242,
+   "openFieldYardsTotal": 74,
+   "standardDowns": {
+    "ppa": 0.06610980145027005,
+    "successRate": 0.3684210526315789,
+    "explosiveness": 1.1883606866059806
+   },
+   "passingDowns": {
+    "ppa": -0.03289849373494763,
+    "successRate": 0.25,
+    "explosiveness": 2.602055897006764
+   },
+   "rushingPlays": {
+    "ppa": -0.017145496048591353,
+    "totalPPA": -0.5658013696035147,
+    "successRate": 0.3333333333333333,
+    "explosiveness": 1.4038432292877652
+   },
+   "passingPlays": {
+    "ppa": 0.2802942417163481,
+    "totalPPA": 8.969415734923139,
+    "successRate": 0.3125,
+    "explosiveness": 1.940916536936566
+   }
+  },
+  "defense": {
+   "plays": 92,
+   "drives": 17,
+   "ppa": 0.055363850985209496,
+   "totalPPA": 5.093474290639274,
+   "successRate": 0.33695652173913043,
+   "explosiveness": 1.3825050711639857,
+   "powerSuccess": 0.5555555555555556,
+   "stuffRate": 0.2037037037037037,
+   "lineYards": 2.0925925925925926,
+   "lineYardsTotal": 113,
+   "secondLevelYards": 0.46296296296296297,
+   "secondLevelYardsTotal": 25,
+   "openFieldYards": 0.037037037037037035,
+   "openFieldYardsTotal": 2,
+   "standardDowns": {
+    "ppa": 0.010794761757587923,
+    "successRate": 0.3559322033898305,
+    "explosiveness": 1.0929588728422721
+   },
+   "passingDowns": {
+    "ppa": 0.1350479802103511,
+    "successRate": 0.30303030303030304,
+    "explosiveness": 1.990552087639584
+   },
+   "rushingPlays": {
+    "ppa": -0.2020137568308199,
+    "totalPPA": -10.908742868864275,
+    "successRate": 0.25925925925925924,
+    "explosiveness": 0.799023307326604
+   },
+   "passingPlays": {
+    "ppa": 0.5518715351042045,
+    "totalPPA": 20.419246798855564,
+    "successRate": 0.4594594594594595,
+    "explosiveness": 1.8630194649124174
+   }
+  }
+ },
+ "plays/stats (one team)": [],
+ "ratings/elo (week 5)": {
+  "year": 2023,
+  "team": "Air Force",
+  "conference": "Mountain West",
+  "elo": 1797
+ },
+ "ratings/sp": {
+  "year": 2023,
+  "team": "Michigan",
+  "conference": "Big Ten",
+  "rating": 31.3,
+  "ranking": 1,
+  "secondOrderWins": null,
+  "sos": null,
+  "offense": {
+   "ranking": 12,
+   "rating": 36.6,
+   "success": null,
+   "explosiveness": null,
+   "rushing": null,
+   "passing": null,
+   "standardDowns": null,
+   "passingDowns": null,
+   "runRate": null,
+   "pace": null
+  },
+  "defense": {
+   "ranking": 1,
+   "rating": 7.2,
+   "success": null,
+   "explosiveness": null,
+   "rushing": null,
+   "passing": null,
+   "standardDowns": null,
+   "passingDowns": null,
+   "havoc": {
+    "total": null,
+    "frontSeven": null,
+    "db": null
+   }
+  },
+  "specialTeams": {
+   "rating": 1.8
+  }
+ },
+ "ratings/fpi": {
+  "year": 2023,
+  "team": "UAB",
+  "conference": "American Athletic",
+  "fpi": -10.908,
+  "resumeRanks": {
+   "strengthOfRecord": 114,
+   "fpi": 110,
+   "averageWinProbability": 99,
+   "strengthOfSchedule": 81,
+   "remainingStrengthOfSchedule": null,
+   "gameControl": 110
+  },
+  "efficiencies": {
+   "overall": 31.707,
+   "offense": 51.298,
+   "defense": 24.139,
+   "specialTeams": 39.61
+  }
+ },
+ "ratings/srs": {
+  "year": 2023,
+  "team": "Michigan",
+  "conference": "Big Ten",
+  "division": "East",
+  "ranking": 1,
+  "rating": 25.9
+ },
+ "player/usage": {
+  "season": 2023,
+  "id": "4385430",
+  "name": "Xavier Johnson",
+  "position": "WR",
+  "team": "Ohio State",
+  "conference": "B1G",
+  "usage": {
+   "overall": 0.054,
+   "pass": 0.038,
+   "rush": 0.071,
+   "firstDown": 0.052,
+   "secondDown": 0.058,
+   "thirdDown": 0.059,
+   "standardDowns": 0.044,
+   "passingDowns": 0.081
+  }
+ },
+ "recruiting/players": {
+  "id": "254348",
+  "athleteId": "4686250",
+  "recruitType": "HighSchool",
+  "year": 2020,
+  "ranking": 1,
+  "name": "Alante Brown",
+  "school": "St. Thomas More (Prep)",
+  "committedTo": "Nebraska",
+  "position": "WR",
+  "height": 72,
+  "weight": 190,
+  "stars": 4,
+  "rating": 0.8937,
+  "city": "Oakdale",
+  "stateProvince": "CT",
+  "country": "USA",
+  "hometownInfo": {
+   "latitude": 41.4662093,
+   "longitude": -72.1573008,
+   "fipsCode": "09011"
+  }
+ },
+ "talent": {
+  "year": 2023,
+  "team": "Alabama",
+  "talent": 1015.43
+ },
+ "player/returning": {
+  "season": 2023,
+  "team": "Air Force",
+  "conference": "Mountain West",
+  "totalPPA": 121.7,
+  "totalPassingPPA": 12.9,
+  "totalReceivingPPA": 11.3,
+  "totalRushingPPA": 97.5,
+  "percentPPA": 0.358,
+  "percentPassingPPA": 0.295,
+  "percentReceivingPPA": 0.148,
+  "percentRushingPPA": 0.444,
+  "usage": 0.267,
+  "passingUsage": 0.032,
+  "receivingUsage": 0.339,
+  "rushingUsage": 0.292
+ },
+ "player/portal": {
+  "season": 2023,
+  "firstName": "Jamar",
+  "lastName": "Rucks",
+  "position": "DL",
+  "origin": "App State",
+  "destination": "Kennesaw State",
+  "transferDate": "2022-12-05T11:46:00.000Z",
+  "rating": null,
+  "stars": 3,
+  "eligibility": "Immediate"
+ }
+}
