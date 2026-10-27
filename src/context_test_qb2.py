@@ -11,17 +11,18 @@ N_BOOT = 1000
 
 tg = pl.read_parquet("data/processed/team_games.parquet")
 rg = pl.read_parquet("data/processed/receiver_games.parquet")
+panel_raw = pl.read_parquet("data/processed/panel_v2.parquet")
 
 REC_ID = next(
     c for c in ("player_id", "athlete_id", "receiver_id", "id")
-    if c in rg.columns
+    if c in panel_raw.columns
 )
 
 yd = rg.group_by(["game_id", "team"]).agg(pass_yds=pl.col("yds").sum())
 T0 = (tg.filter(pl.col("pass_att") >= 10)
         .join(yd, on=["game_id", "team"], how="left")
         .with_columns(pass_yds=pl.col("pass_yds").fill_null(0).clip(lower_bound=0))
-        .select("game_id", "season", "team", "opponent", "pass_att", "pass_yds"))
+        .select("game_id", "season", "week", "seasonType", "team", "opponent", "pass_att", "pass_yds"))
 m = T0["pass_yds"].sum() / T0["pass_att"].sum()
 
 # the passer with the most attempts in each team-game, and how many he threw
@@ -72,35 +73,20 @@ S = (T0.join(qb, on=["game_id", "team"], how="inner")
            ypa=pl.col("pass_yds") / pl.col("pass_att"),
            adj_pass_yds=pl.col("pass_yds") - pl.col("pass_att") * pl.col("def_loo")
        )
-       .sort(["qb_id", "season", "game_id"]))
+       .sort(["qb_id", "season", "week", "game_id"]))
 
-# Chronological game index within each team-season (1..N_games) for the primary 2/3 train -> 1/3 holdout split
-team_sched = (T0.select("game_id", "season", "team")
-                .unique()
-                .sort(["season", "team", "game_id"])
-                .with_columns(
-                    team_game_num=pl.int_range(1, pl.len() + 1).over(["season", "team"]),
-                    team_n_games=pl.len().over(["season", "team"]),
-                )
-                .with_columns(
-                    # First 2/3 of each team's season = training window; last 1/3 = holdout test window
-                    is_train_split=pl.col("team_game_num") <= (pl.col("team_n_games") * 2 // 3)
-                ))
-
-S = S.join(team_sched.select("game_id", "team", "team_game_num", "team_n_games", "is_train_split"),
-           on=["game_id", "team"], how="left")
-
-# Join receiver games to team-QB games
-RG = (rg.select("game_id", "team", REC_ID, pl.col("yds").fill_null(0).clip(lower_bound=0).alias("rec_yds"))
-        .join(S, on=["game_id", "team"], how="inner")
+panel = panel_raw.select(
+    "game_id", "team", REC_ID, pl.col("yds").fill_null(0).clip(lower_bound=0).alias("rec_yds")
+)
+RG = (panel.join(S, on=["game_id", "team"], how="inner")
         .with_columns(
+            post=(pl.col("seasonType") == "postseason").cast(pl.Int8),
             rec_rate=pl.col("rec_yds") / pl.col("pass_att"),
-            # QB's defense-adjusted passing yards in this game thrown to OTHER teammates (excluding receiver r)
             other_adj_yds=pl.col("adj_pass_yds") - pl.col("rec_yds"),
             cl_rec=pl.col(REC_ID).cast(pl.String) + "|" + pl.col("team") + "|" + pl.col("season").cast(pl.String),
-            cl_team=pl.col("team") + "|" + pl.col("season").cast(pl.String),
+            cl_team=pl.col("team") + "|" + pl.col("season").cast(pl.String)
         )
-        .sort([REC_ID, "qb_id", "season", "game_id"]))
+        .sort([REC_ID, "qb_id", "season", "post", "week", "game_id"]))
 
 mean_rec_ypa = float(RG["rec_yds"].sum() / RG["pass_att"].sum())
 mean_other_ypa = m - mean_rec_ypa  # Exact baseline prior for (adj_pass_yds - rec_yds) / pass_att
@@ -224,28 +210,13 @@ def run_test(k, label, mode="season_loo"):
           f" | per-receiver raw slope: {beta_raw[1]:.4f}")
 
 
-print(f"Baseline team YPA (m): {m:.3f} | Mean single-receiver YPA: {mean_rec_ypa:.3f} "
-      f"(1/{m/mean_rec_ypa:.2f} of team) | Mean OTHER-teammates YPA: {mean_other_ypa:.3f}\n")
-
-print("=== 0. SANITY CHECK: SAME-GAME QB YPA TO OTHER TEAMMATES (excluding receiver r) ===")
+print(f"Baseline team YPA (m): {m:.3f} | Mean single-receiver YPA: {mean_rec_ypa:.3f} | Mean OTHER-teammates YPA: {mean_other_ypa:.3f}\n")
+print("DIAGNOSTIC ONLY, not a quarterback test: same-game teammates' production")
 run_test(K_PRIMARY, "same-game other WRs", mode="same_game_other")
-
-print("\n=== 1. WITHIN-SEASON LOO QB PRODUCTION W/O TARGET RECEIVER (other games this season) ===")
-run_test(K_PRIMARY, f"PRIMARY k={K_PRIMARY:.0f}", mode="season_loo")
-for k in K_SENS:
-    run_test(k, f"sensitivity k={k:.0f}", mode="season_loo")
-
-print("\n=== 2. HYBRID LOO (current season + 0.5 * prior seasons w/o target receiver) ===")
-run_test(K_PRIMARY, f"PRIMARY k={K_PRIMARY:.0f}", mode="season_plus_prior")
-for k in K_SENS:
-    run_test(k, f"sensitivity k={k:.0f}", mode="season_plus_prior")
-
-print("\n=== 3. STRICTLY PRE-GAME: CURRENT-SEASON PRIOR GAMES ONLY (w/o target receiver) ===")
-run_test(K_PRIMARY, f"PRIMARY k={K_PRIMARY:.0f}", mode="pregame_current_season")
-for k in K_SENS:
-    run_test(k, f"sensitivity k={k:.0f}", mode="pregame_current_season")
-
-print("\n=== 4. STRICTLY PRE-GAME: WEIGHTED (1.0 * current season + 0.2 * prior seasons w/o target receiver) ===")
+print("\nPRIMARY (set in advance): strictly pre-game, weighted, K=200")
 run_test(K_PRIMARY, f"PRIMARY k={K_PRIMARY:.0f}", mode="pregame_weighted")
+print("\nSENSITIVITY, reported whatever they show")
 for k in K_SENS:
-    run_test(k, f"sensitivity k={k:.0f}", mode="pregame_weighted")
+    run_test(k, f"weighted k={k:.0f}", mode="pregame_weighted")
+run_test(K_PRIMARY, f"current season only k={K_PRIMARY:.0f}", mode="pregame_current_season")
+run_test(K_PRIMARY, f"career k={K_PRIMARY:.0f}", mode="pregame_career")
