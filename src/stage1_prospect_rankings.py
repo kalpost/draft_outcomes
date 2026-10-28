@@ -170,18 +170,17 @@ def main():
         prob_starter = max(prob_starter, prob_boom + 0.05)
         prob_bust = min(prob_bust, 1.0 - prob_starter)
 
-        # ---------------------------------------------------------------------
+# ---------------------------------------------------------------------
         # 3. Continuous Quantiles (p10, p50, p90)
         # ---------------------------------------------------------------------
-        # Floor (p10): anchored at 100-400 yds for Day 2/3, up to 700-750 yds for elite alphas
-        p10 = float(np.clip(100.0 + (college_grade - 45.0) * 12.0, 50.0, 1100.0))
+        # Floor (p10): realistic 10th percentile capturing injury / bust downside (25 yds for fliers up to ~380 yds for alphas)
+        p10 = float(np.clip(25.0 + max(0.0, college_grade - 55.0) * 8.5, 15.0, 420.0))
 
-        # Ceiling (p90): anchored at 1,800-2,600 yds for Day 2/3, up to 4,000+ yds for elite alphas
-        p90 = float(np.clip(1600.0 + (college_grade - 45.0) * 45.0, 1200.0, 4200.0))
+        # Ceiling (p90): realistic 90th percentile capturing true elite 3Y alpha outcomes (up to ~4,850 yds for alphas)
+        p90 = float(np.clip(1800.0 + (college_grade - 55.0) * 68.0, 1200.0, 4850.0))
 
         # Median (p50): Piecewise linear CDF inversion across threshold anchors
         p50 = compute_piecewise_median(p10, p90, prob_bust, prob_starter, prob_boom)
-
         # ---------------------------------------------------------------------
         # 4. Draft Slot Expectation & Arbitrage (Descriptive Only)
         # ---------------------------------------------------------------------
