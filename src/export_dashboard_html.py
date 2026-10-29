@@ -2,7 +2,7 @@
 Generate Interactive Stage 1 Pure College Prospect Dashboard HTML.
 Translates pre-draft M2 college ratings and athletic profiles into 
 visual bell curve density forecasts and outcome probability buckets
-(2012–2022 cohorts, zero draft slot bias).
+across historical (2012–2022) and recent holdout cohorts (2023–2025).
 
 Usage:
     python3 export_dashboard_html.py
@@ -16,13 +16,11 @@ import sys
 
 # Support Polars with graceful fallback to Pandas/PyArrow
 try:
-  import polars as pl
-
-  HAS_POLARS = True
+    import polars as pl
+    HAS_POLARS = True
 except ImportError:
-  import pandas as pd
-
-  HAS_POLARS = False
+    import pandas as pd
+    HAS_POLARS = False
 
 # 1. Flexible path resolution
 candidates = [
@@ -36,203 +34,211 @@ DATA_DIR = next(
     Path("data/processed"),
 )
 RANKINGS_FILE = DATA_DIR / "stage1_prospect_rankings.parquet"
+RECENT_FILE = DATA_DIR / "stage1_recent_prospects.parquet"
+JSON_FALLBACK = Path("artifacts/file_generation/ttl=63d/intermediate/prospects_data.json")
 
-if not RANKINGS_FILE.exists():
-  print(f"Error: Could not find {RANKINGS_FILE}.")
-  print("Please run `python3 run_stage1_pipeline.py` first.")
-  sys.exit(1)
+if not RANKINGS_FILE.exists() and not JSON_FALLBACK.exists():
+    print(f"Error: Could not find {RANKINGS_FILE}.")
+    print("Please run `python3 run_stage1_pipeline.py` first.")
+    sys.exit(1)
 
-print(f"Reading prospect rankings from {RANKINGS_FILE}...")
 records = []
 
-if HAS_POLARS:
-  df = pl.read_parquet(RANKINGS_FILE)
-  col_map = {
-      "athlete_name": "name",
-      "name_draft": "name",
-      "player_name": "name",
-      "draft_overall": "pick",
-      "college_team": "college",
-      "school_name": "college",
-      "nfl_team": "team",
-      "nfl_proj_floor": "p10",
-      "nfl_proj_median": "p50",
-      "nfl_proj_ceiling": "p90",
-      "nfl_proj_p10": "p10",
-      "nfl_proj_p50": "p50",
-      "nfl_proj_p90": "p90",
-      "draft_round": "round",
-      "actual": "actual_y1_3",
-      "nfl_actual_y1_3": "actual_y1_3",
-  }
-  for old_c, new_c in col_map.items():
-    if old_c in df.columns and new_c not in df.columns:
-      df = df.rename({old_c: new_c})
+if RANKINGS_FILE.exists():
+    print(f"Reading historical prospect rankings from {RANKINGS_FILE}...")
+    if HAS_POLARS:
+        df = pl.read_parquet(RANKINGS_FILE)
+        col_map = {
+            "athlete_name": "name",
+            "name_draft": "name",
+            "player_name": "name",
+            "draft_overall": "pick",
+            "college_team": "college",
+            "school_name": "college",
+            "nfl_team": "team",
+            "nfl_proj_floor": "p10",
+            "nfl_proj_median": "p50",
+            "nfl_proj_ceiling": "p90",
+            "nfl_proj_p10": "p10",
+            "nfl_proj_p50": "p50",
+            "nfl_proj_p90": "p90",
+            "draft_round": "round",
+            "actual": "actual_y1_3",
+            "nfl_actual_y1_3": "actual_y1_3",
+        }
+        for old_c, new_c in col_map.items():
+            if old_c in df.columns and new_c not in df.columns:
+                df = df.rename({old_c: new_c})
 
-  if "draft_year" in df.columns:
-    df = df.filter(
-        (pl.col("draft_year") >= 2012) & (pl.col("draft_year") <= 2022)
-    )
+        if "draft_year" in df.columns:
+            df = df.filter((pl.col("draft_year") >= 2012) & (pl.col("draft_year") <= 2022))
 
-  sort_col = "college_grade" if "college_grade" in df.columns else df.columns[0]
-  raw_rows = df.sort(sort_col, descending=True).iter_rows(named=True)
-else:
-  pdf = pd.read_parquet(RANKINGS_FILE)
-  col_map = {
-      "athlete_name": "name",
-      "name_draft": "name",
-      "player_name": "name",
-      "draft_overall": "pick",
-      "college_team": "college",
-      "school_name": "college",
-      "nfl_team": "team",
-      "nfl_proj_floor": "p10",
-      "nfl_proj_median": "p50",
-      "nfl_proj_ceiling": "p90",
-      "nfl_proj_p10": "p10",
-      "nfl_proj_p50": "p50",
-      "nfl_proj_p90": "p90",
-      "draft_round": "round",
-      "actual": "actual_y1_3",
-      "nfl_actual_y1_3": "actual_y1_3",
-  }
-  pdf = pdf.rename(
-      columns={
-          k: v
-          for k, v in col_map.items()
-          if k in pdf.columns and v not in pdf.columns
-      }
-  )
-  if "draft_year" in pdf.columns:
-    pdf = pdf[(pdf["draft_year"] >= 2012) & (pdf["draft_year"] <= 2022)]
-  sort_col = (
-      "college_grade" if "college_grade" in pdf.columns else pdf.columns[0]
-  )
-  raw_rows = pdf.sort_values(by=sort_col, ascending=False).to_dict(
-      orient="records"
-  )
-
-for idx, r in enumerate(raw_rows):
-  c_grade = float(r.get("college_grade") or 50.0)
-  p_peak = float(r.get("peak_season_rating") or 1.0)
-  c_rating = float(r.get("career_rating") or p_peak)
-  f_rating = float(r.get("final_season_rating") or p_peak)
-  g_share = float(r.get("final_season_games_share") or 1.0)
-
-  p10 = int(round(float(r.get("p10") or 300)))
-  p50 = int(round(float(r.get("p50") or 1200)))
-  p90 = int(round(float(r.get("p90") or 2500)))
-  actual = float(r.get("actual_y1_3") or r.get("nfl_actual_y1_3") or 0.0)
-
-  # Calibrated outcome probabilities
-  prob_bust = float(r.get("prob_bust") or 0.50)
-  prob_starter = float(r.get("prob_starter") or 0.25)
-  prob_boom = float(r.get("prob_boom") or 0.12)
-
-  # Pre-draft combine / pro day athletics
-  forty = (
-      float(r.get("forty"))
-      if r.get("forty") is not None and not math.isnan(float(r.get("forty") or 0))
-      else None
-  )
-  speed_score = (
-      float(r.get("speed_score"))
-      if r.get("speed_score") is not None
-      and not math.isnan(float(r.get("speed_score") or 0))
-      else None
-  )
-  hass = (
-      float(r.get("hass"))
-      if r.get("hass") is not None and not math.isnan(float(r.get("hass") or 0))
-      else None
-  )
-  cone_shuttle = (
-      float(r.get("cone_shuttle"))
-      if r.get("cone_shuttle") is not None
-      and not math.isnan(float(r.get("cone_shuttle") or 0))
-      else None
-  )
-  vert_in = (
-      float(r.get("vert_in"))
-      if r.get("vert_in") is not None
-      and not math.isnan(float(r.get("vert_in") or 0))
-      else None
-  )
-  ht_in = (
-      float(r.get("ht_in"))
-      if r.get("ht_in") is not None
-      and not math.isnan(float(r.get("ht_in") or 0))
-      else None
-  )
-  wt_lbs = (
-      float(r.get("wt_lbs"))
-      if r.get("wt_lbs") is not None
-      and not math.isnan(float(r.get("wt_lbs") or 0))
-      else None
-  )
-
-  # Profile tag
-  prof = r.get("prospect_profile", None)
-  if not prof:
-    if c_grade >= 89.0:
-      prof = "Blue-Chip Alpha"
-    elif actual >= 2000 and c_grade < 80.0:
-      prof = "Boom-or-Bust Flier"
-    elif c_grade >= 80.0:
-      prof = "High-Floor Starter"
+        sort_col = "college_grade" if "college_grade" in df.columns else df.columns[0]
+        raw_rows = df.sort(sort_col, descending=True).iter_rows(named=True)
     else:
-      prof = "High Bust Risk"
+        pdf = pd.read_parquet(RANKINGS_FILE)
+        col_map = {
+            "athlete_name": "name",
+            "name_draft": "name",
+            "player_name": "name",
+            "draft_overall": "pick",
+            "college_team": "college",
+            "school_name": "college",
+            "nfl_team": "team",
+            "nfl_proj_floor": "p10",
+            "nfl_proj_median": "p50",
+            "nfl_proj_ceiling": "p90",
+            "nfl_proj_p10": "p10",
+            "nfl_proj_p50": "p50",
+            "nfl_proj_p90": "p90",
+            "draft_round": "round",
+            "actual": "actual_y1_3",
+            "nfl_actual_y1_3": "actual_y1_3",
+        }
+        pdf = pdf.rename(columns={k: v for k, v in col_map.items() if k in pdf.columns and v not in pdf.columns})
+        if "draft_year" in pdf.columns:
+            pdf = pdf[(pdf["draft_year"] >= 2012) & (pdf["draft_year"] <= 2022)]
+        sort_col = "college_grade" if "college_grade" in pdf.columns else pdf.columns[0]
+        raw_rows = pdf.sort_values(by=sort_col, ascending=False).to_dict(orient="records")
 
-  delta = int(round(actual - p50))
+    for idx, r in enumerate(raw_rows):
+        c_grade = float(r.get("college_grade") or 50.0)
+        p_peak = float(r.get("peak_season_rating") or 1.0)
+        c_rating = float(r.get("career_rating") or p_peak)
+        f_rating = float(r.get("final_season_rating") or p_peak)
+        g_share = float(r.get("final_season_games_share") or 1.0)
 
-  # Primary production tier hit
-  if actual >= 2500:
-    actual_bucket = "WR1 Boom (≥2.5k)"
-  elif actual >= 1500:
-    actual_bucket = "Quality Starter (1.5k–2.5k)"
-  elif actual >= 500:
-    actual_bucket = "Role Contributor (500–1.5k)"
-  else:
-    actual_bucket = "Bust Flop (<500)"
+        p10 = int(round(float(r.get("p10") or 300)))
+        p50 = int(round(float(r.get("p50") or 1200)))
+        p90 = int(round(float(r.get("p90") or 2500)))
+        actual = float(r.get("actual_y1_3") or r.get("nfl_actual_y1_3") or 0.0)
 
-  records.append({
-      "id": f"wr_{idx}_{r.get('draft_year', 2020)}",
-      "name": r.get("name") or "Unknown Prospect",
-      "college": r.get("college") or "NCAA",
-      "team": r.get("team", "NFL"),
-      "year": int(r.get("draft_year") or 2020),
-      "round": int(r.get("round") or 1),
-      "pick": int(r.get("pick") or 1),
-      "grade": round(c_grade, 1),
-      "peak_rating": round(p_peak, 2),
-      "career_rating": round(c_rating, 2),
-      "final_rating": round(f_rating, 2),
-      "games_share": round(g_share, 2),
-      "p10": p10,
-      "p50": p50,
-      "p90": p90,
-      "prob_boom": round(prob_boom, 3),
-      "prob_starter": round(prob_starter, 3),
-      "prob_bust": round(prob_bust, 3),
-      "forty": round(forty, 2) if forty else None,
-      "speed_score": round(speed_score, 1) if speed_score else None,
-      "hass": round(hass, 1) if hass else None,
-      "cone_shuttle": round(cone_shuttle, 2) if cone_shuttle else None,
-      "vert_in": round(vert_in, 1) if vert_in else None,
-      "ht_in": round(ht_in, 1) if ht_in else None,
-      "wt_lbs": round(wt_lbs, 1) if wt_lbs else None,
-      "delta": delta,
-      "actual_y1_3": int(round(actual)),
-      "actual_bucket": actual_bucket,
-      "profile": prof,
-  })
+        prob_bust = float(r.get("prob_bust") or 0.50)
+        prob_starter = float(r.get("prob_starter") or 0.25)
+        prob_boom = float(r.get("prob_boom") or 0.12)
+
+        forty = float(r.get("forty")) if r.get("forty") is not None and not math.isnan(float(r.get("forty") or 0)) else None
+        speed_score = float(r.get("speed_score")) if r.get("speed_score") is not None and not math.isnan(float(r.get("speed_score") or 0)) else None
+        hass = float(r.get("hass")) if r.get("hass") is not None and not math.isnan(float(r.get("hass") or 0)) else None
+        cone_shuttle = float(r.get("cone_shuttle")) if r.get("cone_shuttle") is not None and not math.isnan(float(r.get("cone_shuttle") or 0)) else None
+        vert_in = float(r.get("vert_in")) if r.get("vert_in") is not None and not math.isnan(float(r.get("vert_in") or 0)) else None
+        ht_in = float(r.get("ht_in")) if r.get("ht_in") is not None and not math.isnan(float(r.get("ht_in") or 0)) else None
+        wt_lbs = float(r.get("wt_lbs")) if r.get("wt_lbs") is not None and not math.isnan(float(r.get("wt_lbs") or 0)) else None
+
+        prof = r.get("prospect_profile", None)
+        if not prof:
+            if c_grade >= 89.0:
+                prof = "Blue-Chip Alpha"
+            elif actual >= 2000 and c_grade < 80.0:
+                prof = "Boom-or-Bust Flier"
+            elif c_grade >= 80.0:
+                prof = "High-Floor Starter"
+            else:
+                prof = "High Bust Risk"
+
+        delta = int(round(actual - p50))
+
+        if actual >= 2500:
+            actual_bucket = "WR1 Boom (≥2.5k)"
+        elif actual >= 1500:
+            actual_bucket = "Quality Starter (1.5k–2.5k)"
+        elif actual >= 500:
+            actual_bucket = "Role Contributor (500–1.5k)"
+        else:
+            actual_bucket = "Bust Flop (<500)"
+
+        records.append({
+            "id": f"wr_{idx}_{r.get('draft_year', 2020)}",
+            "name": r.get("name") or "Unknown Prospect",
+            "college": r.get("college") or "NCAA",
+            "team": r.get("team", "NFL"),
+            "year": int(r.get("draft_year") or 2020),
+            "round": int(r.get("round") or 1),
+            "pick": int(r.get("pick") or 1),
+            "grade": round(c_grade, 1),
+            "peak_rating": round(p_peak, 2),
+            "career_rating": round(c_rating, 2),
+            "final_rating": round(f_rating, 2),
+            "games_share": round(g_share, 2),
+            "p10": p10,
+            "p50": p50,
+            "p90": p90,
+            "prob_boom": round(prob_boom, 3),
+            "prob_starter": round(prob_starter, 3),
+            "prob_bust": round(prob_bust, 3),
+            "forty": round(forty, 2) if forty else None,
+            "speed_score": round(speed_score, 1) if speed_score else None,
+            "hass": round(hass, 1) if hass else None,
+            "cone_shuttle": round(cone_shuttle, 2) if cone_shuttle else None,
+            "vert_in": round(vert_in, 1) if vert_in else None,
+            "ht_in": round(ht_in, 1) if ht_in else None,
+            "wt_lbs": round(wt_lbs, 1) if wt_lbs else None,
+            "delta": delta,
+            "actual_y1_3": int(round(actual)),
+            "actual_bucket": actual_bucket,
+            "is_active": False,
+            "profile": prof,
+        })
+
+# 2. Append 2023, 2024, and 2025 prospects if recent predictions file exists
+if RECENT_FILE.exists():
+    print(f"Loading recent draft cohorts (2023–2025) from {RECENT_FILE}...")
+    if HAS_POLARS:
+        rec_df = pl.read_parquet(RECENT_FILE)
+        rec_rows = rec_df.iter_rows(named=True)
+    else:
+        rec_pdf = pd.read_parquet(RECENT_FILE)
+        rec_rows = rec_pdf.to_dict(orient="records")
+
+    base_idx = len(records)
+    for idx, r in enumerate(rec_rows):
+        c_grade = float(r.get("college_grade") or 50.0)
+        p10 = int(round(float(r.get("nfl_proj_floor") or 300)))
+        p50 = int(round(float(r.get("nfl_proj_median") or 1200)))
+        p90 = int(round(float(r.get("nfl_proj_ceiling") or 2500)))
+        yr = int(r.get("draft_year") or 2024)
+
+        forty = float(r.get("forty_sec")) if r.get("forty_sec") is not None and not math.isnan(float(r.get("forty_sec") or 0)) else None
+        hass = float(r.get("hass")) if r.get("hass") is not None and not math.isnan(float(r.get("hass") or 0)) else None
+        burst = float(r.get("burst_score")) if r.get("burst_score") is not None and not math.isnan(float(r.get("burst_score") or 0)) else None
+        agility = float(r.get("agility_sum")) if r.get("agility_sum") is not None and not math.isnan(float(r.get("agility_sum") or 0)) else None
+
+        records.append({
+            "id": f"recent_{base_idx + idx}_{yr}",
+            "name": r.get("name") or "Prospect",
+            "college": r.get("college") or "NCAA",
+            "team": r.get("draft_slot_info") or "NFL",
+            "year": yr,
+            "round": 1,
+            "pick": 1,
+            "grade": round(c_grade, 1),
+            "peak_rating": 1.5,
+            "career_rating": 1.4,
+            "final_rating": 1.5,
+            "games_share": 1.0,
+            "p10": p10,
+            "p50": p50,
+            "p90": p90,
+            "prob_boom": round(float(r.get("prob_boom") or 0.15), 3),
+            "prob_starter": round(float(r.get("prob_starter") or 0.30), 3),
+            "prob_bust": round(float(r.get("prob_bust") or 0.50), 3),
+            "forty": round(forty, 2) if forty else None,
+            "speed_score": round(hass, 1) if hass else None,
+            "hass": round(hass, 1) if hass else None,
+            "cone_shuttle": round(agility, 2) if agility else None,
+            "vert_in": None,
+            "ht_in": None,
+            "wt_lbs": None,
+            "delta": 0,
+            "actual_y1_3": 0,
+            "actual_bucket": r.get("prospect_profile") or "In Progress",
+            "is_active": True,
+            "profile": r.get("prospect_profile") or "Active Prospect",
+        })
 
 prospects_json = json.dumps(records)
 years_available = sorted(list(set(r["year"] for r in records)), reverse=True)
-print(
-    f"Loaded {len(records)} prospects across classes"
-    f" {min(years_available)}–{max(years_available)}."
-)
+print(f"Loaded {len(records)} total prospects across classes {min(years_available)}–{max(years_available)}.")
 
 html_template = f"""<!DOCTYPE html>
 <html lang="en" class="h-full bg-slate-950 text-slate-100">
@@ -268,7 +274,7 @@ html_template = f"""<!DOCTYPE html>
             <h1 class="text-base font-bold tracking-tight text-white">Stage 1: Pure College Prospect Board</h1>
             <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Zero Draft Slot Bias</span>
           </div>
-          <p class="text-xs text-slate-400">Bell Curve Density Forecasts &amp; Calibrated Outcome Tiers (2012–2022)</p>
+          <p class="text-xs text-slate-400">Bell Curve Density Forecasts &amp; Calibrated Outcome Tiers (2012–2025)</p>
         </div>
       </div>
 
@@ -297,7 +303,7 @@ html_template = f"""<!DOCTYPE html>
           <span id="stat-total-count" class="text-2xl font-bold text-white font-mono">{len(records)}</span>
           <span class="text-xs text-slate-400">Total WRs</span>
         </div>
-        <span class="text-[11px] text-emerald-400 mt-1">100% 3-Year NFL Outcomes</span>
+        <span class="text-[11px] text-emerald-400 mt-1">2012–2025 Classes</span>
       </div>
 
       <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between">
@@ -312,7 +318,7 @@ html_template = f"""<!DOCTYPE html>
       <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between">
         <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">WR1 Boom Tier (≥2.5k)</span>
         <div class="flex items-baseline space-x-2 mt-1">
-          <span class="text-2xl font-bold text-emerald-400 font-mono">+8.2%</span>
+          <span class="text-2xl font-bold text-emerald-400 font-mono">+8.3%</span>
           <span class="text-xs text-slate-400">Brier Skill</span>
         </div>
         <span class="text-[11px] text-slate-400 mt-1">Base Rate: 12.1% (Alpha Ceiling)</span>
@@ -479,15 +485,15 @@ html_template = f"""<!DOCTYPE html>
               <span class="text-slate-400 font-semibold block text-indigo-300">Starter Tier (≥1,500 yds)</span>
               <div class="flex items-baseline justify-between mt-1">
                 <span class="text-lg font-bold font-mono text-emerald-400">+11.6% BSS</span>
-                <span class="text-slate-400">Brier: 0.1652 vs 0.1868</span>
+                <span class="text-slate-400">Brier: 0.1651 vs 0.1868</span>
               </div>
             </div>
 
             <div class="p-3 bg-slate-950 rounded-lg border border-slate-800">
               <span class="text-slate-400 font-semibold block text-emerald-300">Boom WR1 Alpha (≥2,500 yds)</span>
               <div class="flex items-baseline justify-between mt-1">
-                <span class="text-lg font-bold font-mono text-emerald-400">+8.2% BSS</span>
-                <span class="text-slate-400">Brier: 0.0978 vs 0.1065</span>
+                <span class="text-lg font-bold font-mono text-emerald-400">+8.3% BSS</span>
+                <span class="text-slate-400">Brier: 0.0977 vs 0.1065</span>
               </div>
             </div>
 
@@ -495,7 +501,7 @@ html_template = f"""<!DOCTYPE html>
               <span class="text-slate-400 font-semibold block text-rose-300">Bust / Flop Tier (&lt;500 yds)</span>
               <div class="flex items-baseline justify-between mt-1">
                 <span class="text-lg font-bold font-mono text-emerald-400">+10.5% BSS</span>
-                <span class="text-slate-400">Brier: 0.2237 vs 0.2500</span>
+                <span class="text-slate-400">Brier: 0.2236 vs 0.2500</span>
               </div>
             </div>
 
@@ -592,7 +598,7 @@ html_template = f"""<!DOCTYPE html>
         </div>
 
         <div class="flex items-center justify-between text-xs pt-1 border-t border-slate-800/60 text-slate-400">
-          <span>Actual NFL Y1–3 Production: <strong id="modal-actual" class="text-emerald-400 font-mono text-sm">-</strong></span>
+          <span id="modal-actual-label">Actual NFL Y1–3 Production: <strong id="modal-actual" class="text-emerald-400 font-mono text-sm">-</strong></span>
           <span>Diff vs Likelihood Mode: <strong id="modal-delta" class="font-mono text-sm">-</strong></span>
         </div>
       </div>
@@ -710,14 +716,17 @@ html_template = f"""<!DOCTYPE html>
       return 'bg-slate-800 text-slate-400 border-slate-700';
     }}
 
-    function getOutcomeBadge(bucket) {{
+    function getOutcomeBadge(p) {{
+      if (p.is_active) {{
+        return `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">${{p.profile}}</span>`;
+      }}
+      const bucket = p.actual_bucket || '';
       if (bucket.includes('Boom')) return '<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">WR1 Boom</span>';
       if (bucket.includes('Starter')) return '<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Quality Starter</span>';
       if (bucket.includes('Role')) return '<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">Contributor</span>';
       return '<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">Bust / Flop</span>';
     }}
 
-    // High-performance SVG Bell Curve Generator
     function createBellCurveSparkline(p, width = 280, height = 36, maxVal = 4850) {{
       const mu = Number(p.p50);
       const p10 = Number(p.p10);
@@ -744,22 +753,29 @@ html_template = f"""<!DOCTYPE html>
       const boomX = ((2500 / maxVal) * width).toFixed(1);
       const medX = (Math.min(maxVal, Math.max(0, mu)) / maxVal * width).toFixed(1);
 
-      const actClamped = Math.min(maxVal, Math.max(0, actual));
-      const actX = ((actClamped / maxVal) * width).toFixed(1);
-      const actDensity = (1.0 / (sigma * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * Math.pow((actClamped - mu) / sigma, 2));
-      const actY = (height - 2 - ((actDensity / maxDensity) * (height - 5))).toFixed(1);
-
-      let dotColor = '#34d399';
-      let dotGlow = 'rgba(52, 211, 153, 0.6)';
-      if (actual < 500) {{
-        dotColor = '#fb7185';
-        dotGlow = 'rgba(251, 113, 133, 0.6)';
-      }} else if (actual < mu - 200) {{
-        dotColor = '#f59e0b';
-        dotGlow = 'rgba(245, 158, 11, 0.6)';
-      }}
-
       const gradId = `grad_${{p.id}}`;
+
+      let markerHtml = '';
+      if (!p.is_active && actual > 0) {{
+        const actClamped = Math.min(maxVal, Math.max(0, actual));
+        const actX = ((actClamped / maxVal) * width).toFixed(1);
+        const actDensity = (1.0 / (sigma * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * Math.pow((actClamped - mu) / sigma, 2));
+        const actY = (height - 2 - ((actDensity / maxDensity) * (height - 5))).toFixed(1);
+
+        let dotColor = '#34d399';
+        let dotGlow = 'rgba(52, 211, 153, 0.6)';
+        if (actual < 500) {{
+          dotColor = '#fb7185';
+          dotGlow = 'rgba(251, 113, 133, 0.6)';
+        }} else if (actual < mu - 200) {{
+          dotColor = '#f59e0b';
+          dotGlow = 'rgba(245, 158, 11, 0.6)';
+        }}
+        markerHtml = `
+          <circle cx="${{actX}}" cy="${{actY}}" r="5" fill="${{dotGlow}}" opacity="0.4" />
+          <circle cx="${{actX}}" cy="${{actY}}" r="3.2" fill="${{dotColor}}" stroke="#0f172a" stroke-width="1.2" />
+        `;
+      }}
 
       return `
         <svg class="bell-curve-svg w-full overflow-visible" height="${{height}}" viewBox="0 0 ${{width}} ${{height}}" preserveAspectRatio="none">
@@ -770,7 +786,7 @@ html_template = f"""<!DOCTYPE html>
             </linearGradient>
           </defs>
 
-          <!-- Reference Cutoffs -->
+          <!-- Cutoff Markers -->
           <line x1="${{bustX}}" y1="0" x2="${{bustX}}" y2="${{height}}" stroke="#f43f5e" stroke-width="0.75" stroke-dasharray="2,2" opacity="0.4" />
           <line x1="${{starterX}}" y1="0" x2="${{starterX}}" y2="${{height}}" stroke="#6366f1" stroke-width="0.75" stroke-dasharray="2,2" opacity="0.4" />
           <line x1="${{boomX}}" y1="0" x2="${{boomX}}" y2="${{height}}" stroke="#10b981" stroke-width="0.75" stroke-dasharray="2,2" opacity="0.4" />
@@ -781,9 +797,8 @@ html_template = f"""<!DOCTYPE html>
           <!-- Median Mode Line (Peak) -->
           <line x1="${{medX}}" y1="2" x2="${{medX}}" y2="${{height}}" stroke="#c7d2fe" stroke-width="1.2" stroke-dasharray="2,2" opacity="0.8" />
 
-          <!-- Actual Outcome Point on Bell Curve -->
-          <circle cx="${{actX}}" cy="${{actY}}" r="5" fill="${{dotGlow}}" opacity="0.4" />
-          <circle cx="${{actX}}" cy="${{actY}}" r="3.2" fill="${{dotColor}}" stroke="#0f172a" stroke-width="1.2" />
+          <!-- Actual Outcome Point if completed -->
+          ${{markerHtml}}
         </svg>
       `;
     }}
@@ -838,7 +853,9 @@ html_template = f"""<!DOCTYPE html>
       let html = '';
       items.forEach((p, idx) => {{
         let deltaHtml = '';
-        if (p.delta > 200) {{
+        if (p.is_active) {{
+          deltaHtml = `<span class="text-slate-500 font-mono text-xs">-</span>`;
+        }} else if (p.delta > 200) {{
           deltaHtml = `<span class="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">+${{p.delta.toLocaleString()}}</span>`;
         }} else if (p.delta < -200) {{
           deltaHtml = `<span class="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">${{p.delta.toLocaleString()}}</span>`;
@@ -846,13 +863,20 @@ html_template = f"""<!DOCTYPE html>
           deltaHtml = `<span class="px-2 py-0.5 rounded text-[11px] font-mono text-slate-400 bg-slate-800/60 border border-slate-700/50">±0</span>`;
         }}
 
+        let actualHtml = '';
+        if (p.is_active) {{
+          actualHtml = `<span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">Active</span>`;
+        }} else {{
+          actualHtml = `<span class="font-mono font-bold text-emerald-400 text-xs">${{p.actual_y1_3.toLocaleString()}}</span>`;
+        }}
+
         let athText = '';
         if (p.forty) {{
           athText = `<div class="font-mono text-slate-200 text-xs">${{p.forty.toFixed(2)}}s 40 <span class="text-[10px] text-indigo-400">(${{p.hass ? p.hass.toFixed(0) : '-'}} HaSS)</span></div>`;
           if (p.cone_shuttle) {{
-            athText += `<div class="text-[10px] text-slate-400 font-mono">${{p.cone_shuttle.toFixed(2)}}s agil · ${{p.wt_lbs ? p.wt_lbs.toFixed(0) + ' lbs' : ''}}</div>`;
+            athText += `<div class="text-[10px] text-slate-400 font-mono">${{p.cone_shuttle.toFixed(2)}}s agil</div>`;
           }} else {{
-            athText += `<div class="text-[10px] text-slate-400 font-mono">${{p.wt_lbs ? p.wt_lbs.toFixed(0) + ' lbs' : 'Combine tested'}}</div>`;
+            athText += `<div class="text-[10px] text-slate-400 font-mono">Combine / Pro Day</div>`;
           }}
         }} else {{
           athText = `<div class="text-xs text-slate-500 italic">No workout data</div><div class="text-[10px] text-slate-600">Pure College Model</div>`;
@@ -877,7 +901,7 @@ html_template = f"""<!DOCTYPE html>
                     <span>·</span>
                     <span class="text-indigo-400 font-semibold">${{p.team}}</span>
                     <span>·</span>
-                    <span>'${{p.year.toString().slice(-2)}}${{p.round ? ' R' + p.round : ''}} (#${{p.pick}})</span>
+                    <span>'${{p.year.toString().slice(-2)}}</span>
                   </div>
                 </div>
               </div>
@@ -903,14 +927,14 @@ html_template = f"""<!DOCTYPE html>
                     <span class="px-1.5 py-0.2 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" title="Boom WR1 alpha probability (≥2,500 yds)">${{pBoomPct}}% Boom</span>
                   </div>
                 </div>
-                <div title="Mode: ${{p.p50.toLocaleString()}} yds · 80% credible: ${{p.p10.toLocaleString()}}–${{p.p90.toLocaleString()}} yds · Actual: ${{p.actual_y1_3.toLocaleString()}} yds">
+                <div title="Mode: ${{p.p50.toLocaleString()}} yds · 80% credible: ${{p.p10.toLocaleString()}}–${{p.p90.toLocaleString()}} yds">
                   ${{createBellCurveSparkline(p)}}
                 </div>
               </div>
             </td>
-            <td class="py-3 px-3 text-right font-mono font-bold text-emerald-400 text-xs">${{p.actual_y1_3.toLocaleString()}}</td>
+            <td class="py-3 px-3 text-right">${{actualHtml}}</td>
             <td class="py-3 px-3 text-center">${{deltaHtml}}</td>
-            <td class="py-3 px-3 text-center">${{getOutcomeBadge(p.actual_bucket)}}</td>
+            <td class="py-3 px-3 text-center">${{getOutcomeBadge(p)}}</td>
           </tr>
         `;
       }});
@@ -922,7 +946,7 @@ html_template = f"""<!DOCTYPE html>
       const missesList = document.getElementById('misses-list');
 
       const hits = [...PROSPECTS]
-        .filter(p => p.prob_boom >= 0.18 && p.actual_y1_3 >= 2400)
+        .filter(p => !p.is_active && p.prob_boom >= 0.18 && p.actual_y1_3 >= 2400)
         .sort((a, b) => b.actual_y1_3 - a.actual_y1_3)
         .slice(0, 8);
 
@@ -949,6 +973,7 @@ html_template = f"""<!DOCTYPE html>
       hitsList.innerHTML = hitsHtml || '<div class="text-xs text-slate-500 p-3">No matching hits found</div>';
 
       const sleepers = [...PROSPECTS]
+        .filter(p => !p.is_active && p.delta > 0)
         .sort((a, b) => b.delta - a.delta)
         .slice(0, 8);
 
@@ -959,7 +984,7 @@ html_template = f"""<!DOCTYPE html>
             <div>
               <div class="flex items-center space-x-2">
                 <span class="font-bold text-white text-xs">${{p.name}}</span>
-                <span class="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-mono">'${{p.year.toString().slice(-2)}} R${{p.round}} (#${{p.pick}})</span>
+                <span class="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-mono">'${{p.year.toString().slice(-2)}} ${{p.team}}</span>
               </div>
               <div class="text-[11px] text-slate-400 mt-0.5">
                 Peak Mode: <span class="font-mono">${{p.p50.toLocaleString()}}</span> · Actual: <span class="font-mono text-emerald-400 font-bold">${{p.actual_y1_3.toLocaleString()}}</span>
@@ -1010,7 +1035,8 @@ html_template = f"""<!DOCTYPE html>
               callbacks: {{
                 afterBody: function(context) {{
                   const item = topItems[context[0].dataIndex];
-                  return `\\nActual Career: ${{item.actual_y1_3.toLocaleString()}} yds (${{item.actual_bucket}})\\nPeak Mode: ${{item.p50.toLocaleString()}} yds`;
+                  const actStr = item.is_active ? 'Active NFL Prospect' : `Actual Career: ${{item.actual_y1_3.toLocaleString()}} yds`;
+                  return `\\n${{actStr}}\\nPeak Mode: ${{item.p50.toLocaleString()}} yds`;
                 }}
               }}
             }}
@@ -1054,19 +1080,27 @@ html_template = f"""<!DOCTYPE html>
       const boomX = ((2500 / maxVal) * width).toFixed(1);
       const medX = (Math.min(maxVal, Math.max(0, mu)) / maxVal * width).toFixed(1);
 
-      const actClamped = Math.min(maxVal, Math.max(0, actual));
-      const actX = ((actClamped / maxVal) * width).toFixed(1);
-      const actDensity = (1.0 / (sigma * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * Math.pow((actClamped - mu) / sigma, 2));
-      const actY = (height - 12 - ((actDensity / maxDensity) * (height - 24))).toFixed(1);
+      let markerHtml = '';
+      if (!p.is_active && actual > 0) {{
+        const actClamped = Math.min(maxVal, Math.max(0, actual));
+        const actX = ((actClamped / maxVal) * width).toFixed(1);
+        const actDensity = (1.0 / (sigma * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * Math.pow((actClamped - mu) / sigma, 2));
+        const actY = (height - 12 - ((actDensity / maxDensity) * (height - 24))).toFixed(1);
 
-      let dotColor = '#34d399';
-      let dotGlow = 'rgba(52, 211, 153, 0.7)';
-      if (actual < 500) {{
-        dotColor = '#fb7185';
-        dotGlow = 'rgba(251, 113, 133, 0.7)';
-      }} else if (actual < mu - 200) {{
-        dotColor = '#f59e0b';
-        dotGlow = 'rgba(245, 158, 11, 0.7)';
+        let dotColor = '#34d399';
+        let dotGlow = 'rgba(52, 211, 153, 0.7)';
+        if (actual < 500) {{
+          dotColor = '#fb7185';
+          dotGlow = 'rgba(251, 113, 133, 0.7)';
+        }} else if (actual < mu - 200) {{
+          dotColor = '#f59e0b';
+          dotGlow = 'rgba(245, 158, 11, 0.7)';
+        }}
+        markerHtml = `
+          <line x1="${{actX}}" y1="${{actY}}" x2="${{actX}}" y2="${{height - 10}}" stroke="${{dotColor}}" stroke-width="1.5" opacity="0.7" />
+          <circle cx="${{actX}}" cy="${{actY}}" r="8" fill="${{dotGlow}}" opacity="0.4" />
+          <circle cx="${{actX}}" cy="${{actY}}" r="5" fill="${{dotColor}}" stroke="#0f172a" stroke-width="2" />
+        `;
       }}
 
       container.innerHTML = `
@@ -1078,13 +1112,11 @@ html_template = f"""<!DOCTYPE html>
             </linearGradient>
           </defs>
 
-          <!-- Zone Shading on Baseline -->
           <rect x="0" y="${{height - 8}}" width="${{bustX}}" height="8" fill="#f43f5e" opacity="0.3" />
           <rect x="${{bustX}}" y="${{height - 8}}" width="${{starterX - bustX}}" height="8" fill="#64748b" opacity="0.25" />
           <rect x="${{starterX}}" y="${{height - 8}}" width="${{boomX - starterX}}" height="8" fill="#6366f1" opacity="0.3" />
           <rect x="${{boomX}}" y="${{height - 8}}" width="${{width - boomX}}" height="8" fill="#10b981" opacity="0.3" />
 
-          <!-- Cutoff Markers -->
           <line x1="${{bustX}}" y1="8" x2="${{bustX}}" y2="${{height}}" stroke="#f43f5e" stroke-width="1" stroke-dasharray="3,3" opacity="0.5" />
           <text x="${{bustX - 4}}" y="18" fill="#f43f5e" font-size="9" text-anchor="end" font-family="JetBrains Mono">500 yds (Bust)</text>
 
@@ -1094,17 +1126,12 @@ html_template = f"""<!DOCTYPE html>
           <line x1="${{boomX}}" y1="8" x2="${{boomX}}" y2="${{height}}" stroke="#10b981" stroke-width="1" stroke-dasharray="3,3" opacity="0.5" />
           <text x="${{boomX - 4}}" y="18" fill="#34d399" font-size="9" text-anchor="end" font-family="JetBrains Mono">2,500 yds (Boom)</text>
 
-          <!-- Bell Curve Path -->
           <path d="${{pathD}}" fill="url(#modal-grad)" stroke="#818cf8" stroke-width="2" />
 
-          <!-- Median Mode Line (Peak) -->
           <line x1="${{medX}}" y1="12" x2="${{medX}}" y2="${{height}}" stroke="#e0e7ff" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.9" />
           <text x="${{medX}}" y="10" fill="#e0e7ff" font-size="10" font-weight="bold" text-anchor="middle" font-family="JetBrains Mono">Peak Mode: ${{p.p50.toLocaleString()}} yds</text>
 
-          <!-- Actual Outcome Point with Pin and Callout -->
-          <line x1="${{actX}}" y1="${{actY}}" x2="${{actX}}" y2="${{height - 10}}" stroke="${{dotColor}}" stroke-width="1.5" opacity="0.7" />
-          <circle cx="${{actX}}" cy="${{actY}}" r="8" fill="${{dotGlow}}" opacity="0.4" />
-          <circle cx="${{actX}}" cy="${{actY}}" r="5" fill="${{dotColor}}" stroke="#0f172a" stroke-width="2" />
+          ${{markerHtml}}
         </svg>
       `;
     }}
@@ -1115,10 +1142,10 @@ html_template = f"""<!DOCTYPE html>
 
       document.getElementById('modal-name').textContent = p.name;
       document.getElementById('modal-grade').textContent = p.grade.toFixed(1);
-      document.getElementById('modal-sub').textContent = `${{p.college}} · Drafted by ${{p.team}} (${{p.year}} Round ${{p.round}}, Pick ${{p.pick}})`;
+      document.getElementById('modal-sub').textContent = `${{p.college}} · ${{p.team}} ('${{p.year.toString().slice(-2)}})`;
       
       const badgeContainer = document.getElementById('modal-profile-badge');
-      badgeContainer.outerHTML = `<span id="modal-profile-badge">${{getOutcomeBadge(p.actual_bucket)}}</span>`;
+      badgeContainer.outerHTML = `<span id="modal-profile-badge">${{getOutcomeBadge(p)}}</span>`;
 
       renderModalBellCurve(p);
 
@@ -1131,25 +1158,37 @@ html_template = f"""<!DOCTYPE html>
       ['bucket-card-bust', 'bucket-card-role', 'bucket-card-starter', 'bucket-card-boom'].forEach(id => {{
         document.getElementById(id).className = 'p-2.5 rounded-lg border border-slate-800 bg-slate-900/50 transition';
       }});
-      if (p.actual_y1_3 >= 2500) {{
-        document.getElementById('bucket-card-boom').className = 'p-2.5 rounded-lg border border-emerald-500/80 bg-emerald-950/30 transition ring-1 ring-emerald-500/50';
-      }} else if (p.actual_y1_3 >= 1500) {{
-        document.getElementById('bucket-card-starter').className = 'p-2.5 rounded-lg border border-indigo-500/80 bg-indigo-950/30 transition ring-1 ring-indigo-500/50';
-      }} else if (p.actual_y1_3 >= 500) {{
-        document.getElementById('bucket-card-role').className = 'p-2.5 rounded-lg border border-slate-500/80 bg-slate-800/40 transition ring-1 ring-slate-400/50';
-      }} else {{
-        document.getElementById('bucket-card-bust').className = 'p-2.5 rounded-lg border border-rose-500/80 bg-rose-950/30 transition ring-1 ring-rose-500/50';
-      }}
 
-      document.getElementById('modal-actual').textContent = p.actual_y1_3.toLocaleString() + ' yds';
-      
-      const deltaEl = document.getElementById('modal-delta');
-      if (p.delta >= 0) {{
-        deltaEl.textContent = '+' + p.delta.toLocaleString() + ' yds';
-        deltaEl.className = 'font-mono text-sm text-emerald-400 font-bold';
+      if (p.is_active) {{
+        if (p.prob_boom >= 0.28) {{
+          document.getElementById('bucket-card-boom').className = 'p-2.5 rounded-lg border border-emerald-500/80 bg-emerald-950/30 transition ring-1 ring-emerald-500/50';
+        }} else if (p.prob_starter >= 0.38) {{
+          document.getElementById('bucket-card-starter').className = 'p-2.5 rounded-lg border border-indigo-500/80 bg-indigo-950/30 transition ring-1 ring-indigo-500/50';
+        }} else {{
+          document.getElementById('bucket-card-bust').className = 'p-2.5 rounded-lg border border-rose-500/80 bg-rose-950/30 transition ring-1 ring-rose-500/50';
+        }}
+        document.getElementById('modal-actual').textContent = 'In Progress';
+        document.getElementById('modal-delta').textContent = '-';
+        document.getElementById('modal-delta').className = 'font-mono text-sm text-slate-400';
       }} else {{
-        deltaEl.textContent = p.delta.toLocaleString() + ' yds';
-        deltaEl.className = 'font-mono text-sm text-rose-400 font-bold';
+        if (p.actual_y1_3 >= 2500) {{
+          document.getElementById('bucket-card-boom').className = 'p-2.5 rounded-lg border border-emerald-500/80 bg-emerald-950/30 transition ring-1 ring-emerald-500/50';
+        }} else if (p.actual_y1_3 >= 1500) {{
+          document.getElementById('bucket-card-starter').className = 'p-2.5 rounded-lg border border-indigo-500/80 bg-indigo-950/30 transition ring-1 ring-indigo-500/50';
+        }} else if (p.actual_y1_3 >= 500) {{
+          document.getElementById('bucket-card-role').className = 'p-2.5 rounded-lg border border-slate-500/80 bg-slate-800/40 transition ring-1 ring-slate-400/50';
+        }} else {{
+          document.getElementById('bucket-card-bust').className = 'p-2.5 rounded-lg border border-rose-500/80 bg-rose-950/30 transition ring-1 ring-rose-500/50';
+        }}
+        document.getElementById('modal-actual').textContent = p.actual_y1_3.toLocaleString() + ' yds';
+        const deltaEl = document.getElementById('modal-delta');
+        if (p.delta >= 0) {{
+          deltaEl.textContent = '+' + p.delta.toLocaleString() + ' yds';
+          deltaEl.className = 'font-mono text-sm text-emerald-400 font-bold';
+        }} else {{
+          deltaEl.textContent = p.delta.toLocaleString() + ' yds';
+          deltaEl.className = 'font-mono text-sm text-rose-400 font-bold';
+        }}
       }}
 
       document.getElementById('modal-forty').textContent = p.forty ? p.forty.toFixed(2) + 's' : 'N/A';
@@ -1193,10 +1232,10 @@ html_template = f"""<!DOCTYPE html>
       const items = getFilteredAndSortedProspects();
       if (!items.length) return;
 
-      const headers = ['Rank', 'Name', 'College', 'NFL_Team', 'Draft_Year', 'Round', 'Pick', 'College_Grade', 'Forty', 'HaSS', 'Agility', 'Peak_Mode_P50', 'P10_Floor', 'P90_Ceiling', 'P_Boom', 'P_Starter', 'P_Bust', 'Actual_Y1_3', 'Delta_Mode', 'Outcome_Bucket'];
+      const headers = ['Rank', 'Name', 'College', 'NFL_Team', 'Draft_Year', 'Round', 'Pick', 'College_Grade', 'Forty', 'HaSS', 'Agility', 'Peak_Mode_P50', 'P10_Floor', 'P90_Ceiling', 'P_Boom', 'P_Starter', 'P_Bust', 'Actual_Y1_3', 'Delta_Mode', 'Outcome_Bucket', 'Is_Active'];
       const rows = items.map((p, idx) => [
-        idx + 1, `"${{p.name}}"`, `"${{p.college}}"`, p.team, p.year, p.round, p.pick, p.grade.toFixed(1),
-        p.forty || '', p.hass || '', p.cone_shuttle || '', p.p50, p.p10, p.p90, p.prob_boom, p.prob_starter, p.prob_bust, p.actual_y1_3, p.delta, `"${{p.actual_bucket}}"`
+        idx + 1, `"${{p.name}}"`, `"${{p.college}}"`, `"${{p.team}}"`, p.year, p.round, p.pick, p.grade.toFixed(1),
+        p.forty || '', p.hass || '', p.cone_shuttle || '', p.p50, p.p10, p.p90, p.prob_boom, p.prob_starter, p.prob_bust, p.is_active ? 'Active' : p.actual_y1_3, p.is_active ? '' : p.delta, `"${{p.actual_bucket}}"`, p.is_active ? 1 : 0
       ]);
 
       const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\\n');
@@ -1298,11 +1337,11 @@ out_paths = [
 ]
 
 for opath in out_paths:
-  try:
-    with open(opath, "w") as f:
-      f.write(html_template)
-    print(f"Done! Successfully generated {opath.resolve()}")
-  except Exception:
-    pass
+    try:
+        with open(opath, "w") as f:
+            f.write(html_template)
+        print(f"Done! Successfully generated {opath.resolve()}")
+    except Exception:
+        pass
 
 print("Open directly in your browser: open stage1_prospect_dashboard.html")

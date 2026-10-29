@@ -1,0 +1,41 @@
+name,draft_year,college,draft_slot_info,college_grade,forty_sec,hass,burst_score,agility_sum,nfl_proj_floor,nfl_proj_median,nfl_proj_ceiling,prob_starter,prob_boom,prob_bust,prospect_profile
+Jaxon Smith-Njigba,2023,Ohio State,R1 Pick 20,93.5,4.52,93.9,99.8,10.5,358,2087,4584,0.503,0.317,0.255,Blue-Chip Alpha
+Zay Flowers,2023,Boston College,R1 Pick 22,91.5,4.42,90.4,101.3,,318,1598,3442,0.398,0.217,0.332,Boom-or-Bust Flier
+Jordan Addison,2023,USC / Pitt,R1 Pick 23,91.2,4.49,82.9,97.1,11.24,302,1523,3255,0.381,0.203,0.346,Boom-or-Bust Flier
+Jayden Reed,2023,Michigan State,R2 Pick 50,89.0,4.45,92.8,96.0,11.34,269,1347,3006,0.346,0.177,0.383,High Bust Risk
+Rashee Rice,2023,SMU,R2 Pick 55,88.5,4.51,98.6,113.0,11.25,304,1519,3489,0.383,0.207,0.349,Boom-or-Bust Flier
+Josh Downs,2023,North Carolina,R3 Pick 79,90.0,4.48,80.0,108.4,11.32,254,1273,2776,0.335,0.167,0.396,High Bust Risk
+Tank Dell,2023,Houston,R3 Pick 69,89.0,4.49,76.0,100.0,11.32,221,1108,2426,0.301,0.143,0.432,High Bust Risk
+Puka Nacua,2023,BYU,R5 Pick 177,89.5,4.57,92.8,94.7,11.68,281,1408,3045,0.353,0.181,0.37,High Bust Risk
+Quentin Johnston,2023,TCU,R1 Pick 21,82.0,4.51,103.3,113.2,11.56,241,1266,3261,0.33,0.17,0.399,High Bust Risk
+Jonathan Mingo,2023,Ole Miss,R2 Pick 39,81.5,4.46,112.3,110.1,11.75,237,1208,3109,0.314,0.158,0.413,High Bust Risk
+Jalin Hyatt,2023,Tennessee,R3 Pick 73,83.0,4.4,92.8,112.4,,251,1282,3166,0.326,0.166,0.397,High Bust Risk
+Cedric Tillman,2023,Tennessee,R3 Pick 74,82.5,4.54,103.3,104.6,11.68,238,1170,2902,0.3,0.147,0.426,High Bust Risk
+Dontayvion Wicks,2023,Virginia,R5 Pick 159,85.0,4.62,90.9,109.2,11.55,257,1271,3028,0.324,0.163,0.402,High Bust Risk
+Demario Douglas,2023,Liberty,R6 Pick 210,82.0,4.44,85.8,110.3,11.34,226,1112,2767,0.286,0.137,0.441,High Bust Risk
+Marvin Harrison Jr.,2024,Ohio State,R1 Pick 4,98.2,4.42,112.8,106.7,11.0,412,2324,4850,0.552,0.364,0.226,Blue-Chip Alpha
+Malik Nabers,2024,LSU,R1 Pick 6,97.5,4.35,110.2,115.8,10.899999999999999,403,2428,4850,0.574,0.392,0.215,Blue-Chip Alpha
+Rome Odunze,2024,Washington,R1 Pick 9,96.0,4.45,111.1,108.0,10.91,386,2209,4761,0.532,0.344,0.24,Blue-Chip Alpha
+Brian Thomas Jr.,2024,LSU,R1 Pick 23,92.5,4.33,122.0,107.4,,347,1954,4472,0.488,0.302,0.274,Blue-Chip Alpha
+Ladd McConkey,2024,Georgia,R2 Pick 34,91.0,4.39,98.4,101.7,10.76,331,1754,3946,0.436,0.252,0.306,High-Floor Starter
+Xavier Worthy,2024,Texas,R1 Pick 28,89.0,4.21,102.2,113.7,11.3,310,1727,4018,0.431,0.25,0.309,High-Floor Starter
+Ricky Pearsall,2024,Florida,R1 Pick 31,87.0,4.41,99.9,115.3,10.69,290,1565,3812,0.403,0.226,0.338,Boom-or-Bust Flier
+Xavier Legette,2024,South Carolina,R1 Pick 32,87.5,4.39,119.0,110.5,11.55,295,1533,3752,0.4,0.223,0.345,Boom-or-Bust Flier
+Keon Coleman,2024,Florida State,R2 Pick 33,84.5,4.61,97.2,106.5,11.26,265,1430,3484,0.361,0.193,0.364,High Bust Risk
+Ja'Lynn Polk,2024,Washington,R2 Pick 37,86.0,4.52,97.5,105.9,11.4,280,1457,3437,0.365,0.194,0.36,High Bust Risk
+Adonai Mitchell,2024,Texas,R2 Pick 52,88.0,4.34,117.5,111.6,11.3,300,1657,4016,0.426,0.246,0.321,Boom-or-Bust Flier
+Jermaine Burton,2024,Alabama,R3 Pick 80,87.0,4.45,98.9,108.8,,288,1432,3349,0.362,0.191,0.366,High Bust Risk
+Jalen McMillan,2024,Washington,R3 Pick 92,86.5,4.47,98.7,104.4,11.120000000000001,282,1398,3276,0.353,0.184,0.373,High Bust Risk
+Troy Franklin,2024,Oregon,R4 Pick 102,88.0,4.41,94.2,108.0,11.15,300,1553,3542,0.385,0.209,0.342,Boom-or-Bust Flier
+Malik Washington,2024,Virginia,R6 Pick 184,89.0,4.47,89.8,115.8,11.02,282,1410,3178,0.36,0.188,0.37,High Bust Risk
+Travis Hunter,2025,Colorado,Top 5 Projected,97.0,4.4,98.7,108.8,10.8,398,2275,4745,0.537,0.349,0.232,Blue-Chip Alpha
+Tetairoa McMillan,2025,Arizona,Top 10 Projected,96.5,4.52,107.1,101.7,11.129999999999999,392,2138,4447,0.511,0.321,0.248,Blue-Chip Alpha
+Luther Burden III,2025,Missouri,Top 15 Projected,95.0,4.44,104.8,105.3,10.969999999999999,375,2074,4421,0.499,0.311,0.257,Blue-Chip Alpha
+Emeka Egbuka,2025,Ohio State,Round 1 Projected,92.0,4.48,101.8,102.5,10.879999999999999,342,1898,4201,0.463,0.278,0.282,High-Floor Starter
+Tre Harris,2025,Ole Miss,Round 1-2 Projected,93.0,4.5,103.8,101.3,11.15,353,1892,4080,0.46,0.273,0.284,High-Floor Starter
+Isaiah Bond,2025,Texas,Round 1-2 Projected,90.0,4.36,98.0,106.7,10.97,321,1794,4066,0.441,0.258,0.298,High-Floor Starter
+Matthew Golden,2025,Texas,Day 2 Projected,88.5,4.42,100.8,104.0,11.08,305,1610,3680,0.399,0.221,0.331,Boom-or-Bust Flier
+Elic Ayomanor,2025,Stanford,Day 2 Projected,89.0,4.47,106.6,106.3,11.239999999999998,310,1666,3852,0.417,0.237,0.32,High-Floor Starter
+Xavier Restrepo,2025,Miami,Day 2-3 Projected,88.0,4.56,87.8,98.7,11.170000000000002,255,1274,2872,0.329,0.164,0.4,High Bust Risk
+Tai Felton,2025,Maryland,Day 2-3 Projected,88.0,4.45,95.5,102.7,11.29,291,1453,3311,0.365,0.193,0.362,High Bust Risk
+Jack Bech,2025,TCU,Day 2-3 Projected,87.5,4.52,106.9,101.3,11.2,295,1476,3470,0.376,0.202,0.357,Boom-or-Bust Flier
