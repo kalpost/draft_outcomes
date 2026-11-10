@@ -1,22 +1,26 @@
 #!/usr/bin/env python3
 """
-Dynamic Year-Specific NFL WR Prospect Board Builder (`build_rankings_app.py`)
-=============================================================================
-Reads output parquets written by `run_unified_pipeline.py` and emits a self-contained
-HTML application (`prospect_rankings_app.html` / `index.html`) with:
-  - Every scored draft class in the dataset (`DRAFT_START_YEAR`–`DRAFT_END_YEAR`, plus any
-    `SCORE_UNDRAFTED_CLASS_YEAR` pre-draft college prospects).
-  - Intuitive Conditional Outcome Framing (replacing the misleading raw `p50` focal point):
-      * Full 80% Outcome Range (`p10 – p90`)
-      * "If He Hits" (`hit_yds`): Expected 3-year NFL yardage conditional on panning out as an
-        NFL starter (`0.42 * p50 + 0.58 * p90`), so a high-upside prospect like Tetairoa McMillan
-        shows his true ~2,420-yard starter expectation (3,160 ceiling) rather than an unconditional
-        1,333-yard median that blends bust and starter regimes together.
-      * "If He Misses" (`miss_yds`): Downside/bust expectation (`p10–p20` floor regime) if injuries
-        or role issues derail his rookie contract.
-      * Hit Odds (`P(Starter >= 1,500)` & `P(Boom >= 2,500)`) vs. Miss Odds (`P(Bust < 500)`).
-  - Toggle: Team-Neutral (Stage 1.5) vs. Drafted-Team Fit (Stage 2).
-  - Interactive Year-Specific Mock Landing-Spot Simulator.
+NFL WR Prospect Translation Board & Monte Carlo What-If Lab (`build_rankings_app.py`)
+=====================================================================================
+Reads output parquets written by `run_unified_pipeline.py` and emits a self-contained,
+zero-dependency HTML application (`prospect_rankings_app.html`) with a two-tab architecture:
+
+  Tab 1 — Prospect Rankings Board:
+    - Clean editorial dark-slate palette (inspired by The Athletic / PFF / Linear).
+    - Redesigned **Visual Range Track** per row: shows Floor (`p10`) on the left, Ceiling (`p90`)
+      on the right, a labeled marker at **"If He Hits"** (`hit_yds`, expected starter outcome),
+      and an Actual outcome marker for completed classes — zero cramped mini-cards.
+    - Quick Team-Fit Drawer: click any player to swap their landing spot across all 32 teams
+      and see their `p10 – p90` range and `If He Hits` target shift on the board.
+
+  Tab 2 — Monte Carlo Career Simulator & What-If Lab:
+    - Dedicated full-screen interactive simulation lab.
+    - Pick any prospect (`2009–2027`), any NFL team (`32 teams`), and any historical offensive
+      season (`2009–2026`), or click **Auto-Find Best / Worst Landing Spot**.
+    - Runs a **1,000-Trial Monte Carlo Simulation** in real time in the browser (using Box-Muller
+      normal draws through the prospect's exact split-normal sqrt-yardage quantile curve) and
+      renders an interactive outcome distribution histogram + **Single-Career Y1/Y2/Y3 Stat Roller**
+      (generating Receptions, Yards, TDs, and YPC for Years 1, 2, and 3).
 """
 
 from __future__ import annotations
@@ -33,10 +37,10 @@ from config import (
     COMPLETED_NFL_SEASON,
     NFL_STATS_PLAYER_PATH,
     PROCESSED_DIR,
+    RECENT_PROSPECTS_PATH,
     ROOT_DIR,
     STAGE1_RANKINGS_PATH,
     STAGE2_RANKINGS_PATH,
-    RECENT_PROSPECTS_PATH,
     norm_nfl_team,
     parse_height_inches,
 )
@@ -154,6 +158,7 @@ def build_prospects(rows: list[dict], last_complete: int) -> list[dict]:
             "px": round(_num(r.get("p_x"), 0.34), 3),
             "pz": round(_num(r.get("p_z"), 0.33), 3),
             "ps": round(_num(r.get("p_slot"), 0.33), 3),
+            "ypc": round(_num(r.get("college_ypc"), 14.2), 1),
             # Stage 1.5: Team-Neutral
             "n_p10": n_p10, "n_p50": n_p50, "n_p90": n_p90,
             "n_hit": n_hit, "n_miss": n_miss,
@@ -316,11 +321,11 @@ def build_year_specific_team_environments(data_dir: Path, years: list[int]) -> d
             top_qb = max(ts["qbs"].items(), key=lambda x: x[1])[0] if ts["qbs"] else "Starting QB"
 
             if pass_vol_z >= 0.70 and qb_epa_z >= 0.70:
-                style = "Air Raid / Elite Pass"
+                style = "Air Raid / High-EPA Pass"
             elif pass_vol_z >= 0.50:
                 style = "Pass-Heavy Spread"
             elif pass_vol_z <= -0.70:
-                style = "Run-First Ground Attack"
+                style = "Run-Centric Ground Attack"
             elif qb_epa_z >= 0.50:
                 style = "High-Efficiency Play-Action"
             else:
@@ -399,117 +404,185 @@ def build_year_specific_team_environments(data_dir: Path, years: list[int]) -> d
 
 
 # ==============================================================================
-# 3. SELF-CONTAINED HTML APPLICATION TEMPLATE
+# 3. SELF-CONTAINED TWO-TAB HTML APPLICATION TEMPLATE
 # ==============================================================================
 HTML_TEMPLATE = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Boom or Bust — NFL WR Prospect Translation Board</title>
+<title>WR Prospect Translation Board &amp; Monte Carlo Lab</title>
 <style>
 :root{
-  --bg:#09090b;--panel:#141418;--panel2:#1c1c22;--line:#27272a;
-  --mut:#a1a1aa;--dim:#71717a;--txt:#fafafa;
-  --g:#34d399;--g-bg:rgba(52,211,153,.12);
-  --b:#60a5fa;--b-bg:rgba(96,165,250,.12);
-  --r:#fb7185;--r-bg:rgba(251,113,133,.12);
-  --a:#fbbf24
+  /* Clean Editorial Slate Palette (Linear / PFF / The Athletic inspired) */
+  --bg:#0b0d11;
+  --surface:#12151c;
+  --surface2:#181c25;
+  --surface3:#1f2430;
+  --line:#242936;
+  --line-hi:#343b4d;
+  --txt:#f3f4f6;
+  --mut:#9ca3af;
+  --dim:#6b7280;
+  --accent:#38bdf8;
+  --accent-bg:rgba(56,189,248,.10);
+  --up:#10b981;
+  --up-bg:rgba(16,185,129,.10);
+  --dn:#f43f5e;
+  --dn-bg:rgba(244,63,94,.10);
+  --warn:#f59e0b
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif}
-.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-.wrap{max-width:1080px;margin:0 auto;padding:0 18px}
-header{position:sticky;top:0;z-index:20;background:rgba(9,9,11,.90);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
-header .wrap{height:60px;display:flex;align-items:center;justify-content:space-between}
+body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+
+/* ---- Top Navigation & Tab Switcher ---- */
+header{position:sticky;top:0;z-index:30;background:rgba(11,13,17,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+header .wrap{height:62px;display:flex;align-items:center;justify-content:space-between;gap:16px}
 .brand{display:flex;align-items:center;gap:12px}
-.logo{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#fafafa,#a1a1aa);color:#09090b;display:grid;place-items:center;font-weight:900;font-size:12px;letter-spacing:-.03em}
+.logo{width:32px;height:32px;border-radius:8px;background:var(--txt);color:var(--bg);display:grid;place-items:center;font-weight:900;font-size:12px;letter-spacing:-.03em}
 .brand b{font-size:15px;letter-spacing:-.01em}.brand small{display:block;color:var(--mut);font-size:11px;margin-top:1px}
+.nav-tabs{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:3px;gap:3px}
+.nav-tabs button{background:none;border:0;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;color:var(--mut);cursor:pointer;transition:all .12s}
+.nav-tabs button:hover{color:var(--txt)}
+.nav-tabs button.on{background:var(--txt);color:var(--bg)}
 button,select,input{font:inherit;color:var(--txt)}
-.btn{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 11px;font-size:12px;cursor:pointer;color:var(--mut);transition:all .12s}
-.btn:hover{border-color:#52525b;color:#fff}
+.btn{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 11px;font-size:12px;cursor:pointer;color:var(--mut);font-weight:600;transition:border-color .12s,color .12s}
+.btn:hover{border-color:var(--line-hi);color:var(--txt)}
+.btn.primary{background:var(--txt);color:var(--bg);border-color:var(--txt);font-weight:700}
+.btn.primary:hover{background:#e5e7eb}
+
+/* ---- Controls Bar ---- */
 .controls{padding:14px 0 12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;border-bottom:1px solid var(--line)}
 .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);font-weight:600}
-select,input[type=text]{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px}
-input[type=text]{width:185px}
-.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px;flex-wrap:wrap}
+select,input[type=text]{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px;outline:none}
+select:focus,input[type=text]:focus{border-color:var(--line-hi)}
+input[type=text]{width:190px}
+.seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px;flex-wrap:wrap}
 .seg button{background:none;border:0;border-radius:6px;padding:4px 9px;font-size:12px;color:var(--mut);cursor:pointer;font-weight:500}
-.seg button.on{background:#f4f4f5;color:#09090b;font-weight:700}
+.seg button.on{background:var(--surface3);color:var(--txt);font-weight:700}
 .chips{margin-left:auto}
 .meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 0;color:var(--dim);font-size:12px}
-.meta b{color:#e4e4e7;font-weight:600}
-.col-hdr{display:grid;grid-template-columns:42px minmax(0,1.25fr) minmax(240px,1.2fr) 155px 90px;gap:14px;padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);font-weight:700}
-.row{display:grid;grid-template-columns:42px minmax(0,1.25fr) minmax(240px,1.2fr) 155px 90px;gap:14px;align-items:center;padding:12px 8px;border-top:1px solid var(--line);cursor:pointer;transition:background .1s}
-.row:hover{background:rgba(39,39,42,.38)}
-.rk{font-size:20px;font-weight:800;color:#52525b}.row:hover .rk{color:#fff}
+.meta b{color:var(--txt);font-weight:600}
+
+/* ---- Tab 1: Prospect Rankings Table & Redesigned Range Track ---- */
+.col-hdr{display:grid;grid-template-columns:44px minmax(0,1.15fr) minmax(300px,1.5fr) 128px 92px;gap:16px;padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);font-weight:700}
+.row{display:grid;grid-template-columns:44px minmax(0,1.15fr) minmax(300px,1.5fr) 128px 92px;gap:16px;align-items:center;padding:13px 10px;border-top:1px solid var(--line);cursor:pointer;transition:background .1s}
+.row:hover{background:var(--surface)}
+.rk{font-size:18px;font-weight:800;color:var(--dim)}.row:hover .rk{color:var(--txt)}
 .nm{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sub{color:var(--mut);font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tag{display:inline-block;font-size:10px;font-weight:600;padding:1px 6px;border-radius:5px;border:1px solid var(--line);background:var(--panel);color:#d4d4d8;margin-left:6px;vertical-align:1px}
-.tag.warn{color:var(--a);border-color:#5b4a12}
-.tag.mock{color:var(--g);border-color:#14532d}
-.bar{position:relative;height:8px;background:var(--panel2);border-radius:4px}
-.bar .fill{position:absolute;top:0;bottom:0;background:linear-gradient(90deg,#3f3f46 0%,#60a5fa 65%,#34d399 100%);border-radius:4px;opacity:.85}
-.bar .hit-tick{position:absolute;top:-3px;width:3px;height:14px;background:#34d399;border-radius:1.5px;box-shadow:0 0 6px rgba(52,211,153,.6)}
-.bar .dot{position:absolute;top:-3px;width:14px;height:14px;margin-left:-7px;border-radius:50%;border:2px solid var(--bg);z-index:2}
-.dot.in{background:#fafafa}.dot.out{background:var(--r)}
-.barlbl{display:flex;justify-content:space-between;color:var(--dim);font-size:10px;margin-top:6px}
-.barlbl .hit-Inline{color:var(--g);font-weight:700}
-.outcomes{display:flex;gap:6px;justify-content:flex-end}
-.pill-box{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 7px;text-align:right;min-width:72px}
-.pill-box.hit{border-color:rgba(52,211,153,.3);background:var(--g-bg)}
-.pill-box.miss{border-color:rgba(251,113,133,.22);background:var(--r-bg)}
-.pill-box small{display:block;font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
-.pill-box b{font-size:12px}
+.tag{display:inline-block;font-size:10px;font-weight:600;padding:1px 6px;border-radius:5px;border:1px solid var(--line);background:var(--surface2);color:var(--mut);margin-left:6px;vertical-align:1px}
+.tag.warn{color:var(--warn);border-color:rgba(245,158,11,.3)}
+.tag.mock{color:var(--accent);border-color:rgba(56,189,248,.35);background:var(--accent-bg)}
+
+/* Clean Range Track Visualization */
+.rng-wrap{display:flex;flex-direction:column;gap:5px}
+.rng-top{display:flex;justify-content:space-between;align-items:baseline;font-size:11px}
+.rng-endpoints{color:var(--mut);font-size:11px}
+.rng-hit-lbl{color:var(--txt);font-weight:700;font-size:11px}
+.rng-hit-lbl span{color:var(--accent)}
+.rng-track{position:relative;height:7px;background:var(--surface2);border-radius:4px;border:1px solid var(--line)}
+.rng-band{position:absolute;top:0;bottom:0;background:linear-gradient(90deg,rgba(156,163,175,.22) 0%,rgba(56,189,248,.48) 100%);border-radius:3px}
+.rng-marker{position:absolute;top:-3px;width:3px;height:11px;background:var(--accent);border-radius:1.5px;margin-left:-1.5px}
+.rng-actual{position:absolute;top:-3.5px;width:12px;height:12px;margin-left:-6px;border-radius:50%;border:2px solid var(--bg);z-index:2}
+.rng-actual.in{background:var(--up)}
+.rng-actual.out{background:var(--dn)}
+.rng-sub{display:flex;justify-content:space-between;font-size:10px;color:var(--dim)}
+
+.hit-col{text-align:right}
+.hit-col b{display:block;font-size:14px;color:var(--txt)}
+.hit-col small{display:block;font-size:11px;color:var(--mut);margin-top:1px}
 .met{text-align:right}.met small{display:block;color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.05em}.met b{font-size:15px}
 #empty{display:none;padding:60px 0;text-align:center;color:var(--dim)}
 footer{color:var(--dim);font-size:11px;padding:18px 0 60px;border-top:1px solid var(--line);line-height:1.6}
+
+/* ---- Quick What-If Drawer on Tab 1 ---- */
 #backdrop{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:40;display:none}
-#drawer{position:fixed;top:0;right:0;bottom:0;width:min(500px,100%);background:var(--bg);border-left:1px solid var(--line);z-index:50;transform:translateX(100%);transition:transform .18s ease-out;overflow-y:auto}
+#drawer{position:fixed;top:0;right:0;bottom:0;width:min(490px,100%);background:var(--bg);border-left:1px solid var(--line);z-index:50;transform:translateX(100%);transition:transform .18s ease-out;overflow-y:auto}
 #drawer.open{transform:none}
-.dh{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px}
-.dh h2{margin:2px 0 4px;font-size:22px;font-weight:800}
+.dh{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;background:var(--surface)}
+.dh h2{margin:2px 0 4px;font-size:21px;font-weight:800}
 .sec{padding:16px 20px;border-bottom:1px solid var(--line)}
-.sec h4{margin:0 0 10px;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--mut)}
+.sec h4{margin:0 0 10px;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--mut);display:flex;justify-content:space-between;align-items:center}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px}
-.cell{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
-.cell.hit-card{border-color:rgba(52,211,153,.35);background:var(--g-bg)}
-.cell.miss-card{border-color:rgba(251,113,133,.28);background:var(--r-bg)}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.cell{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
 .cell small{display:block;color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.05em}
 .cell b{display:block;font-size:16px;margin-top:3px}
 .cell span.sub-note{display:block;font-size:11px;color:var(--dim);margin-top:2px}
-.pos{color:var(--g)}.neg{color:var(--r)}
+.pos{color:var(--up)}.neg{color:var(--dn)}.acc{color:var(--accent)}
+.teams{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin:10px 0}
+.tb{border:1px solid var(--line);background:var(--surface2);border-radius:6px;padding:6px 0;font-size:11px;font-weight:700;cursor:pointer;text-align:center;color:#fff;transition:transform .1s}
+.tb:hover{border-color:var(--line-hi)}
+.tb.on{outline:2px solid var(--txt);transform:scale(1.05);z-index:2}
 .tbl{width:100%;border-collapse:collapse;font-size:12px}
 .tbl th{color:var(--dim);font-weight:600;text-align:right;padding:5px 6px;font-size:10px;text-transform:uppercase}
 .tbl th:first-child,.tbl td:first-child{text-align:left}
 .tbl td{padding:6px;text-align:right;border-top:1px solid var(--line)}
-.mix{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--panel)}
+.mix{display:flex;height:7px;border-radius:4px;overflow:hidden;background:var(--surface2)}
 .mixlbl{display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-top:6px}
-.teams{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
-.tb{border:1px solid var(--line);background:var(--panel2);border-radius:7px;padding:6px 0;font-size:11px;font-weight:800;cursor:pointer;text-align:center;color:#fff}
-.tb.on{outline:2px solid #f4f4f5}
 .note{color:var(--dim);font-size:11px;margin-top:8px;line-height:1.45}
 .acts{display:flex;gap:8px;margin-top:12px}
-.acts .primary{flex:1;background:#f4f4f5;color:#09090b;border:0;border-radius:8px;padding:8px;font-weight:700;cursor:pointer}
-@media(max-width:760px){
+
+/* ---- Tab 2: Dedicated Monte Carlo Simulator & What-If Lab ---- */
+#tab-sim{display:none;padding:20px 0 60px}
+.sim-grid{display:grid;grid-template-columns:340px minmax(0,1fr);gap:20px;align-items:start}
+.sim-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px}
+.sim-card h3{margin:0 0 12px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+.sim-field{margin-bottom:12px}
+.sim-field label{display:block;font-size:11px;color:var(--mut);margin-bottom:5px;font-weight:600}
+.sim-field select{width:100%;padding:8px 10px;font-size:13px;background:var(--surface2)}
+.quick-row{display:flex;gap:6px;margin-top:8px}
+.quick-row button{flex:1}
+.hist-wrap{margin-top:14px;padding:14px;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.hist-bars{display:grid;grid-template-columns:repeat(10,1fr);gap:6px;align-items:end;height:130px;padding-top:18px;border-bottom:1px solid var(--line)}
+.hbar-col{display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end}
+.hbar{width:100%;border-radius:4px 4px 0 0;background:var(--accent);transition:height .2s;position:relative}
+.hbar.bust{background:#4b5563}
+.hbar.boom{background:var(--up)}
+.hbar span{position:absolute;top:-16px;left:0;right:0;text-align:center;font-size:10px;color:var(--mut)}
+.hist-lbls{display:grid;grid-template-columns:repeat(10,1fr);gap:6px;margin-top:6px;text-align:center;font-size:10px;color:var(--dim)}
+
+.career-box{margin-top:16px;padding:16px;background:var(--surface2);border:1px solid var(--line-hi);border-radius:10px}
+.career-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.career-tier{font-size:13px;font-weight:800;letter-spacing:.02em;padding:3px 9px;border-radius:6px;background:var(--surface3)}
+
+@media(max-width:860px){
   .col-hdr{display:none}
-  .row{grid-template-columns:34px minmax(0,1fr) 86px}.bar-col,.outcomes{display:none}
+  .row{grid-template-columns:34px minmax(0,1fr) 86px}.rng-wrap,.hit-col{display:none}
   .chips{margin-left:0}
+  .sim-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
 <body>
 <header><div class="wrap">
-  <div class="brand"><div class="logo">WR</div><div><b>Boom or Bust &mdash; WR Translation Board</b><small><span id="yr-span"></span> classes &middot; zero draft-capital bias</small></div></div>
-  <div><span id="mock-pill" class="tag mock" style="display:none"></span> <button class="btn" id="btn-reset-mocks" style="display:none">Clear mocks</button> <button class="btn" id="btn-reset">Reset filters</button></div>
+  <div class="brand">
+    <div class="logo">WR</div>
+    <div><b>WR Prospect Translation Board</b><small><span id="yr-span"></span> classes &middot; zero draft-capital bias</small></div>
+  </div>
+  <div class="nav-tabs" id="nav-tabs">
+    <button data-tab="board" class="on">1. Prospect Rankings Board</button>
+    <button data-tab="sim">2. Monte Carlo What-If Lab</button>
+  </div>
+  <div>
+    <span id="mock-pill" class="tag mock" style="display:none"></span>
+    <button class="btn" id="btn-reset-mocks" style="display:none">Clear mocks</button>
+    <button class="btn" id="btn-reset">Reset</button>
+  </div>
 </div></header>
 
-<div class="wrap">
+<!-- ====================================================================== -->
+<!-- TAB 1: PROSPECT RANKINGS BOARD                                         -->
+<!-- ====================================================================== -->
+<div class="wrap" id="tab-board">
   <div class="controls">
     <span class="lbl">Sort</span>
     <select id="sel-sort">
       <option value="grade">College Grade</option>
-      <option value="hit">If He Hits (Starter Projection)</option>
+      <option value="hit">If He Hits (Starter Target)</option>
       <option value="ceiling">Ceiling (p90)</option>
       <option value="floor">Floor (p10)</option>
       <option value="boom">Boom Odds (&ge;2,500 yds)</option>
@@ -531,18 +604,57 @@ footer{color:var(--dim);font-size:11px;padding:18px 0 60px;border-top:1px solid 
   <div class="col-hdr">
     <div>Rk</div>
     <div>Prospect</div>
-    <div>80% Outcome Range (p10 &rarr; If Hits &rarr; p90)</div>
-    <div style="text-align:right">If Hits / If Misses</div>
+    <div>80% Outcome Range (p10 Floor &mdash; If He Hits &mdash; p90 Ceiling)</div>
+    <div style="text-align:right">If Hits / Misses</div>
     <div style="text-align:right">Primary</div>
   </div>
   <main id="rows"></main>
   <div id="empty">No prospects match your current filter.</div>
   <footer>
-    <b>Why "If He Hits" instead of raw Median (p50)?</b> NFL rookie-contract receiver outcomes are bimodal: prospects either earn a starting role (~1,800&ndash;3,800+ yds) or get derailed by injuries/depth-chart burial (&lt;600 yds). An unconditional p50 blends both regimes into a misleading ~1,200-yard middle ground that few players actually finish at. Each prospect is shown with their <b>80% Outcome Range (p10&ndash;p90)</b>, their <b>"If He Hits" Starter Projection</b> (green tick), and their <b>"If He Misses" Downside</b>.
-    Actuals are displayed for completed classes through <span id="lastdone"></span> (white dot = landed inside p10&ndash;p90, red = outside).
+    <b>Why "If He Hits" + 80% Range instead of raw Median (p50)?</b> NFL rookie-contract receiver outcomes are bimodal: prospects either earn a starting role (~1,800&ndash;3,800+ yds) or get derailed by injuries/depth-chart burial (&lt;600 yds). Each prospect's range track spans their <b>10th-percentile Floor (p10)</b> to <b>90th-percentile Ceiling (p90)</b>, with the blue marker indicating their expected 3-year total <b>If He Hits</b> as an NFL starter. For completed classes through <span id="lastdone"></span>, the circular dot shows actual 3-year NFL receiving yards (green = inside p10&ndash;p90, red = outside).
   </footer>
 </div>
 
+<!-- ====================================================================== -->
+<!-- TAB 2: DEDICATED MONTE CARLO CAREER SIMULATOR & WHAT-IF LAB            -->
+<!-- ====================================================================== -->
+<div class="wrap" id="tab-sim">
+  <div class="sim-grid">
+    <!-- Left Column: Prospect & Landing Spot Controls -->
+    <div class="sim-card">
+      <h3>1. Select Prospect &amp; Landing Spot</h3>
+      <div class="sim-field">
+        <label>Filter Draft Class</label>
+        <select id="sim-cls-filter"></select>
+      </div>
+      <div class="sim-field">
+        <label>Select WR Prospect</label>
+        <select id="sim-prospect"></select>
+      </div>
+      <div class="sim-field">
+        <label>NFL Team Environment Season</label>
+        <select id="sim-env-year"></select>
+      </div>
+      <div class="sim-field">
+        <label>Pick NFL Landing Spot (32 Teams)</label>
+        <div class="teams" id="sim-teams-grid"></div>
+        <div class="quick-row">
+          <button class="btn" id="sim-btn-best" title="Find team with highest Starter Hit projection">Best Fit Team</button>
+          <button class="btn" id="sim-btn-worst" title="Find team with worst congestion/QB fit">Worst Fit Team</button>
+          <button class="btn" id="sim-btn-drafted" title="Reset to actual drafted team">Drafted Team</button>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--line);padding-top:12px;margin-top:12px">
+        <button class="btn primary" id="sim-btn-pin" style="width:100%">Pin This Landing Spot to Rankings Board</button>
+      </div>
+    </div>
+
+    <!-- Right Column: Live What-If Comparison + 1,000x Monte Carlo + Career Roller -->
+    <div id="sim-main-panel"></div>
+  </div>
+</div>
+
+<!-- Quick Team-Swap Drawer for Tab 1 -->
 <div id="backdrop"></div>
 <aside id="drawer"><div id="drawer-body"></div></aside>
 
@@ -557,7 +669,29 @@ const pct = (v, d) => (v * 100).toFixed(d || 0) + '%';
 const sgn = (v, d) => (v >= 0 ? '+' : '') + (v * 100).toFixed(d == null ? 1 : d) + '%';
 const clip = (v, a, b) => Math.min(b, Math.max(a, v));
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const st = { sort: 'grade', view: 'fit', cls: 'all', arch: 'all', q: '', sel: null, preview: 'KC' };
+
+const TEAM_CODES = [
+  "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE",
+  "DAL", "DEN", "DET", "GB", "HOU", "IND", "JAX", "KC",
+  "LAC", "LAR", "LV", "MIA", "MIN", "NE", "NO", "NYG",
+  "NYJ", "PHI", "PIT", "SEA", "SF", "TB", "TEN", "WAS"
+];
+
+const st = {
+  tab: 'board',
+  sort: 'grade',
+  view: 'fit',
+  cls: 'all',
+  arch: 'all',
+  q: '',
+  sel: P[0] || null,
+  preview: (P[0] && P[0].team) ? P[0].team : 'KC',
+  simCls: 'all',
+  simProspectId: P[0] ? P[0].id : 'p0',
+  simTeam: (P[0] && P[0].team) ? P[0].team : 'KC',
+  simYear: P[0] ? P[0].year : 2025,
+  singleRoll: null
+};
 
 const SORT_DESC = {
   grade: 'ranked by pre-draft college translation grade',
@@ -569,6 +703,7 @@ const SORT_DESC = {
   actual: 'ranked by actual first-3-season NFL receiving yards'
 };
 
+// ---- Split-Normal Sqrt-Scale Math & Continuous Probabilities ----------------
 function erf(x) {
   const s = Math.sign(x); x = Math.abs(x);
   const t = 1 / (1 + 0.3275911 * x);
@@ -587,10 +722,12 @@ function deriveProbs(p10, p50, p90) {
   return { starter, boom, bust, hit, miss };
 }
 
-function mockFit(p, code) {
-  const key = code + '_' + p.year;
+// ---- Stage 2 Ex-Ante Team Fit Calculation (Runs in Browser) -----------------
+function mockFit(p, code, envYear) {
+  const yr = envYear || p.year;
+  const key = code + '_' + yr;
   const env = ENVS[key] || ENVS[code + '_' + META.last_complete] || {
-    name: code, city: code, color: '#3f3f46', year: p.year, qb: 'Starting QB',
+    name: code, city: code, color: '#3f3f46', year: yr, qb: 'Starting QB',
     proe: 0.0, qb_epa: 0.0, vacated: 0.24, style: 'Pro Style', incumbents: []
   };
 
@@ -612,11 +749,11 @@ function mockFit(p, code) {
     if (share >= 0.19 && dot >= 0.46) {
       const pen = (share - 0.14) * Math.pow(dot, 1.3) * 0.48;
       congestionPen += pen;
-      notes.push('Clash w/ ' + inc.name + ' (' + Math.round(dot*100) + '%, -' + (pen*100).toFixed(1) + '%)');
+      notes.push('Clash w/ ' + inc.name + ' (' + Math.round(dot*100) + '% overlap, -' + (pen*100).toFixed(1) + '%)');
     } else if (share >= 0.19 && dot <= 0.28) {
       const syn = share * (1.0 - dot) * 0.22;
       synergyBon += syn;
-      notes.push('Synergy w/ ' + inc.name + ' (' + Math.round(dot*100) + '%, +' + (syn*100).toFixed(1) + '%)');
+      notes.push('Synergy w/ ' + inc.name + ' (+' + (syn*100).toFixed(1) + '%)');
     }
   });
 
@@ -644,7 +781,67 @@ function mockFit(p, code) {
   const p90 = Math.round(clip(p.n_p90 * Math.pow(mult, ceilExp), p50 + 700, 4850));
 
   const roleLabel = rawRole > 0.03 ? 'Synergy' : (rawRole < -0.03 ? 'Congested' : 'Balanced');
-  return Object.assign({ p10, p50, p90, mult, dQb, dVac, dRole, roleLabel, notes: notes.join('; ') || 'Balanced Room', team: env, code }, deriveProbs(p10, p50, p90));
+  return Object.assign(
+    { p10, p50, p90, mult, dQb, dVac, dRole, roleLabel, notes: notes.join(' · ') || 'Balanced Depth Chart', team: env, code, envYear: yr },
+    deriveProbs(p10, p50, p90)
+  );
+}
+
+// ---- Monte Carlo Engine (1,000-Trial Distribution + Single Career Roller) ---
+function drawSqrtSplitNormal(s10, s50, s90) {
+  const sl = Math.max(3, (s50 - s10) / 1.38), sr = Math.max(3.8, (s90 - s50) / 1.38);
+  const u1 = Math.max(1e-7, Math.random()), u2 = Math.random();
+  const z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+  const sDraw = Math.max(0, s50 + z * (z < 0 ? sl : sr));
+  return Math.round(clip(sDraw * sDraw, 0, 5200));
+}
+
+function runMonteCarlo1000(m) {
+  const N = 1000;
+  const s10 = Math.sqrt(Math.max(0, m.p10)), s50 = Math.sqrt(Math.max(25, m.p50)), s90 = Math.sqrt(Math.max(100, m.p90));
+  // 10 bins: 0-499, 500-999, 1000-1499, 1500-1999, 2000-2499, 2500-2999, 3000-3499, 3500-3999, 4000-4499, 4500+
+  const bins = new Array(10).fill(0);
+  let sumHit = 0, nHit = 0;
+  for (let i = 0; i < N; i++) {
+    const y = drawSqrtSplitNormal(s10, s50, s90);
+    const bIdx = Math.min(9, Math.floor(y / 500));
+    bins[bIdx]++;
+    if (y >= 1500) { sumHit += y; nHit++; }
+  }
+  return { bins, meanStarter: nHit > 0 ? Math.round(sumHit / nHit) : m.hit };
+}
+
+function rollSingleCareer(p, m) {
+  const s10 = Math.sqrt(Math.max(0, m.p10)), s50 = Math.sqrt(Math.max(25, m.p50)), s90 = Math.sqrt(Math.max(100, m.p90));
+  const totYds = drawSqrtSplitNormal(s10, s50, s90);
+
+  // Realistic Y1, Y2, Y3 progression weights
+  const w1 = 0.24 + Math.random() * 0.08;
+  const w2 = 0.34 + Math.random() * 0.06;
+  const y1 = Math.round(totYds * w1);
+  const y2 = Math.round(totYds * w2);
+  const y3 = Math.max(0, totYds - y1 - y2);
+
+  // Estimate NFL YPC from college YPC + play style
+  const baseYpc = clip((p.ypc || 14.0) * 0.82 + (p.px * 1.4 + p.pz * 0.9 - p.ps * 0.8), 10.2, 17.5);
+  const mkSeason = (yrNum, yds) => {
+    const ypc = +(baseYpc + (Math.random() - 0.5) * 1.4).toFixed(1);
+    const rec = Math.max(0, Math.round(yds / ypc));
+    const tdRate = clip(0.055 + p.px * 0.03 + (Math.random() - 0.45) * 0.03, 0.02, 0.14);
+    const td = Math.max(0, Math.round(rec * tdRate));
+    return { yr: p.year + yrNum - 1, rec, yds, td, ypc: rec > 0 ? (yds / rec).toFixed(1) : '0.0' };
+  };
+
+  const s1 = mkSeason(1, y1), s2 = mkSeason(2, y2), s3 = mkSeason(3, y3);
+  const totRec = s1.rec + s2.rec + s3.rec;
+  const totTd = s1.td + s2.td + s3.td;
+
+  let outcome = 'Rotational WR3', cls = '';
+  if (totYds >= 2500) { outcome = 'Boom / WR1 Star'; cls = 'pos'; }
+  else if (totYds >= 1500) { outcome = 'Solid NFL Starter'; cls = 'acc'; }
+  else if (totYds < 500) { outcome = 'Rookie-Contract Bust'; cls = 'neg'; }
+
+  return { totYds, totRec, totTd, totYpc: totRec > 0 ? (totYds / totRec).toFixed(1) : '0.0', seasons: [s1, s2, s3], outcome, cls };
 }
 
 function eff(p) {
@@ -684,25 +881,42 @@ function metric(p, e) {
     case 'ceiling': return ['Ceiling', fmt(e.p90)];
     case 'boom': return ['Boom', pct(e.boom)];
     case 'safe': return ['Bust', pct(e.bust)];
-    case 'actual': return ['Actual', p.done ? fmt(p.actual) : 'pending'];
+    case 'actual': return ['Actual', p.done ? fmt(p.actual) : '–'];
     default: return ['Grade', p.grade.toFixed(1)];
   }
 }
 
-function barHtml(p, e) {
-  const x = v => clip(v / SCALE * 100, 0, 100);
-  let dot = '';
+function rangeTrackHtml(p, e) {
+  const x = v => clip((v / SCALE) * 100, 0, 100);
+  let actDot = '';
+  let actTxt = '';
   if (p.done) {
     const inside = p.actual >= e.p10 && p.actual <= e.p90;
-    dot = '<i class="dot ' + (inside ? 'in' : 'out') + '" style="left:' + x(p.actual) + '%" title="Actual 3-Yr NFL Yards: ' + fmt(p.actual) + '"></i>';
+    actDot = '<i class="rng-actual ' + (inside ? 'in' : 'out') + '" style="left:' + x(p.actual) + '%" title="Actual Y1–3: ' + fmt(p.actual) + ' yds"></i>';
+    actTxt = '<span class="' + (inside ? 'pos' : 'neg') + '">Actual: ' + fmt(p.actual) + ' yds</span>';
+  } else {
+    actTxt = '<span>' + pct(e.starter) + ' Starter · ' + pct(e.boom) + ' Boom</span>';
   }
-  return '<div class="bar" title="80% Range: ' + fmt(e.p10) + ' – ' + fmt(e.p90) + ' yds | If He Hits: ' + fmt(e.hit) + ' yds">' +
-    '<div class="fill" style="left:' + x(e.p10) + '%;width:' + Math.max(1, x(e.p90) - x(e.p10)) + '%"></div>' +
-    '<div class="hit-tick" style="left:' + x(e.hit) + '%"></div>' + dot + '</div>' +
-    '<div class="barlbl mono"><span>p10: ' + fmt(e.p10) + '</span><span class="hit-Inline">Hit: ' + fmt(e.hit) + '</span><span>p90: ' + fmt(e.p90) + '</span></div>';
+
+  return '<div class="rng-wrap">' +
+    '<div class="rng-top mono">' +
+      '<span class="rng-endpoints">' + fmt(e.p10) + ' <span style="color:var(--dim)">floor</span></span>' +
+      '<span class="rng-hit-lbl">If Hits: <span>' + fmt(e.hit) + '</span></span>' +
+      '<span class="rng-endpoints"><span style="color:var(--dim)">ceil</span> ' + fmt(e.p90) + '</span>' +
+    '</div>' +
+    '<div class="rng-track">' +
+      '<div class="rng-band" style="left:' + x(e.p10) + '%;width:' + Math.max(1.5, x(e.p90) - x(e.p10)) + '%"></div>' +
+      '<div class="rng-marker" style="left:' + x(e.hit) + '%"></div>' +
+      actDot +
+    '</div>' +
+    '<div class="rng-sub mono">' +
+      '<span>If Misses: ~' + fmt(e.miss) + ' yds (' + pct(e.bust) + ' risk)</span>' +
+      actTxt +
+    '</div>' +
+  '</div>';
 }
 
-function render() {
+function renderBoard() {
   const list = visible();
   $('count').textContent = list.length;
   $('sortdesc').textContent = SORT_DESC[st.sort];
@@ -710,29 +924,26 @@ function render() {
   const done = list.filter(x => x.p.done);
   if (done.length >= 5) {
     const inside = done.filter(x => x.p.actual >= x.e.p10 && x.p.actual <= x.e.p90).length;
-    $('calib').innerHTML = 'Completed classes shown (n=' + done.length + '): <b>' + Math.round(inside / done.length * 100) + '%</b> landed inside p10&ndash;p90 range';
+    $('calib').innerHTML = 'Completed classes (n=' + done.length + '): <b>' + Math.round(inside / done.length * 100) + '%</b> landed inside p10&ndash;p90 range';
   } else { $('calib').textContent = ''; }
 
   const mocked = P.filter(p => p.mock_fit).length;
   $('mock-pill').style.display = mocked ? '' : 'none';
   $('btn-reset-mocks').style.display = mocked ? '' : 'none';
-  $('mock-pill').textContent = mocked + ' mock' + (mocked > 1 ? 's' : '') + ' active';
+  $('mock-pill').textContent = mocked + ' mock' + (mocked > 1 ? 's' : '') + ' pinned';
 
   $('empty').style.display = list.length ? 'none' : 'block';
   $('rows').innerHTML = list.map((x, i) => {
     const p = x.p, e = x.e, m = metric(p, e);
     const pickTxt = (p.pick && p.pick < 500) ? 'Rd ' + p.round + ' #' + p.pick : 'Pre-Draft';
     const tags = (p.no40 ? '<span class="tag warn" title="No 40-yard dash on record">No 40</span>' : '') +
-      (p.mock_fit ? '<span class="tag mock">Mock ' + esc(p.mock_fit.code) + ' (' + p.year + ')</span>' : '');
+      (p.mock_fit ? '<span class="tag mock">Mock: ' + esc(p.mock_fit.code) + ' \'' + String(p.mock_fit.envYear).slice(-2) + '</span>' : '');
     return '<div class="row" data-id="' + p.id + '">' +
       '<div class="rk mono">' + String(i + 1).padStart(2, '0') + '</div>' +
       '<div style="min-width:0"><div class="nm">' + esc(p.name) + '<span class="tag">' + esc(p.arch) + '</span>' + tags + '</div>' +
       '<div class="sub">' + esc(p.college) + ' &middot; ' + p.year + (p.team ? ' &middot; ' + esc(p.team) : '') + ' &middot; ' + pickTxt + '</div></div>' +
-      '<div class="bar-col">' + barHtml(p, e) + '</div>' +
-      '<div class="outcomes mono">' +
-        '<div class="pill-box hit" title="Expected 3-Yr Yards If He Hits (' + pct(e.starter) + ' starter odds)"><small>If Hits</small><b class="pos">' + fmt(e.hit) + '</b></div>' +
-        '<div class="pill-box miss" title="Downside 3-Yr Yards If He Misses (' + pct(e.bust) + ' bust risk)"><small>If Miss</small><b class="neg">' + fmt(e.miss) + '</b></div>' +
-      '</div>' +
+      '<div>' + rangeTrackHtml(p, e) + '</div>' +
+      '<div class="hit-col mono"><b>' + fmt(e.hit) + ' yds</b><small>Miss: ' + fmt(e.miss) + '</small></div>' +
       '<div class="met"><small>' + m[0] + '</small><b class="mono">' + m[1] + '</b></div></div>';
   }).join('');
 }
@@ -743,93 +954,68 @@ function ink(hex) {
 }
 function ftIn(h) { return h == null ? '–' : Math.floor(h / 12) + "'" + Math.round(h % 12) + '"'; }
 
+function findExtremeTeam(p, yr, best) {
+  let chosen = 'KC', bestVal = best ? -1e9 : 1e9;
+  TEAM_CODES.forEach(c => {
+    const res = mockFit(p, c, yr);
+    if ((best && res.hit > bestVal) || (!best && res.hit < bestVal)) {
+      bestVal = res.hit;
+      chosen = c;
+    }
+  });
+  return chosen;
+}
+
+// ---- Tab 1 Quick Team-Swap Drawer --------------------------------------------
 function renderDrawer() {
   const p = st.sel; if (!p) return;
-  const m = mockFit(p, st.preview);
+  const m = mockFit(p, st.preview, p.year);
   const neutral = { p10: p.n_p10, p50: p.n_p50, p90: p.n_p90, hit: p.n_hit, miss: p.n_miss, starter: p.n_st, boom: p.n_bm, bust: p.n_bu };
   const drafted = { p10: p.s_p10, p50: p.s_p50, p90: p.s_p90, hit: p.s_hit, miss: p.s_miss, starter: p.s_st, boom: p.s_bm, bust: p.s_bu };
-  const active = p.mock_fit || drafted;
+  const shiftCls = v => (v >= 0 ? 'pos' : 'neg');
+  const mockShift = m.hit - drafted.hit;
+  const incNames = (m.team.incumbents || []).map(i => i.name + ' (' + Math.round(i.target_share*100) + '%)').join(', ');
 
   const row = (lbl, e) => '<tr><td>' + lbl + '</td><td class="mono">' + fmt(e.p10) + ' &ndash; ' + fmt(e.p90) +
-    '</td><td class="mono pos"><b>' + fmt(e.hit) + '</b></td><td class="mono neg">' + fmt(e.miss) +
+    '</td><td class="mono acc"><b>' + fmt(e.hit) + '</b></td><td class="mono">' + fmt(e.miss) +
     '</td><td class="mono">' + pct(e.starter) + '</td><td class="mono">' + pct(e.boom) + '</td></tr>';
-  const shiftCls = v => (v >= 0 ? 'pos' : 'neg');
-  const draftShift = drafted.hit - neutral.hit;
-  const mockShift = m ? m.hit - neutral.hit : 0;
-
-  let outcome = '';
-  if (p.done) {
-    const inside = p.actual >= drafted.p10 && p.actual <= drafted.p90;
-    outcome = '<div class="sec"><h4>Actual NFL Outcome (Years 1&ndash;3)</h4><div class="grid3">' +
-      '<div class="cell"><small>Actual Y1&ndash;3 Yards</small><b class="mono">' + fmt(p.actual) + '</b></div>' +
-      '<div class="cell"><small>80% Range</small><b class="mono">' + fmt(drafted.p10) + '&ndash;' + fmt(drafted.p90) + '</b></div>' +
-      '<div class="cell"><small>Range Check</small><b class="' + (inside ? 'pos' : 'neg') + '">' + (inside ? 'Inside Range' : 'Outlier') + '</b></div></div></div>';
-  } else {
-    outcome = '<div class="sec"><h4>Actual NFL Outcome</h4><div class="note" style="margin:0">Class of ' + p.year + ' has not completed three full NFL seasons yet.</div></div>';
-  }
 
   const ath = '<div class="grid3">' +
     '<div class="cell"><small>Height / Weight</small><b class="mono">' + ftIn(p.ht) + ' / ' + (p.wt == null ? '–' : Math.round(p.wt) + ' lbs') + '</b></div>' +
     '<div class="cell"><small>40-Yard Dash</small><b class="mono">' + (p.forty == null ? 'No 40' : p.forty.toFixed(2) + 's') + '</b></div>' +
-    '<div class="cell"><small>Burst Score</small><b class="mono">' + (p.burst == null ? '–' : p.burst.toFixed(0)) + '</b></div></div>' +
-    '<div class="note">Short-Area Agility (Cone + Shuttle): ' + (p.agil == null ? 'n/a' : p.agil.toFixed(2) + 's') + ' &middot; Draft Age: ' + (p.age == null ? 'n/a' : p.age.toFixed(1)) + '</div>';
-
-  const mix = '<div class="mix"><div style="width:' + p.px * 100 + '%;background:#f4f4f5"></div><div style="width:' + p.pz * 100 + '%;background:#60a5fa"></div><div style="width:' + p.ps * 100 + '%;background:#34d399"></div></div>' +
-    '<div class="mixlbl"><span>Boundary X ' + pct(p.px) + '</span><span>Flanker Z ' + pct(p.pz) + '</span><span>Interior Slot ' + pct(p.ps) + '</span></div>';
-
-  const pillar = (lbl, v) => '<div class="cell"><small>' + lbl + '</small><b class="mono ' + shiftCls(v) + '">' + sgn(v) + '</b></div>';
-
-  let mockBox = '';
-  if (m) {
-    const incNames = (m.team.incumbents || []).map(i => i.name + ' (' + Math.round(i.target_share*100) + '%)').join(', ');
-    mockBox = '<div class="grid3" style="margin-top:12px">' +
-      '<div class="cell"><small>Mock "If Hits" (' + p.year + ')</small><b class="mono pos">' + fmt(m.hit) + '</b></div>' +
-      '<div class="cell"><small>vs Neutral</small><b class="mono ' + shiftCls(mockShift) + '">' + (mockShift >= 0 ? '+' : '') + fmt(mockShift) + '</b></div>' +
-      '<div class="cell"><small>Room Fit</small><b style="font-size:13px">' + esc(m.roleLabel) + '</b></div></div>' +
-      '<div class="note">' + esc(m.team.city) + ' ' + esc(m.team.name) + ' (' + p.year + ') &middot; QB: ' + esc(m.team.qb) + ' &middot; ' + esc(m.team.style) + ' &middot; ' + Math.round(m.team.vacated * 100) + '% targets vacated</div>' +
-      (incNames ? '<div class="note" style="margin-top:4px;color:var(--mut)">Returning Starters: ' + esc(incNames) + '</div>' : '') +
-      '<div class="note" style="margin-top:4px;color:var(--dim)">Notes: ' + esc(m.notes) + '</div>';
-  }
-
-  const teamCodes = [
-    "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE",
-    "DAL", "DEN", "DET", "GB", "HOU", "IND", "JAX", "KC",
-    "LAC", "LAR", "LV", "MIA", "MIN", "NE", "NO", "NYG",
-    "NYJ", "PHI", "PIT", "SEA", "SF", "TB", "TEN", "WAS"
-  ];
+    '<div class="cell"><small>Burst Score</small><b class="mono">' + (p.burst == null ? '–' : p.burst.toFixed(0)) + '</b></div></div>';
 
   $('drawer-body').innerHTML =
-    '<div class="dh"><div><span class="lbl">Prospect Profile</span><h2>' + esc(p.name) + '</h2>' +
+    '<div class="dh"><div><span class="lbl">Quick Prospect View</span><h2>' + esc(p.name) + '</h2>' +
     '<div class="sub">' + esc(p.college) + ' &middot; Class of ' + p.year + ((p.pick && p.pick < 500) ? ' &middot; Rd ' + p.round + ' #' + p.pick : ' &middot; Pre-Draft') + (p.team ? ' &middot; ' + esc(p.team) : '') + '</div>' +
     '<div style="margin-top:6px"><span class="tag" style="margin-left:0">' + esc(p.arch) + '</span><span class="tag">Grade ' + p.grade.toFixed(1) + '</span></div></div>' +
     '<button class="btn" id="btn-close" style="align-self:flex-start">&times;</button></div>' +
 
-    '<div class="sec"><h4>Conditional 3-Year NFL Projection</h4>' +
-    '<div class="grid2">' +
-      '<div class="cell hit-card"><small>If He Hits (Starter Regime)</small><b class="mono pos">' + fmt(active.hit) + ' yds</b><span class="sub-note">' + pct(active.starter) + ' Starter Odds &middot; Ceiling: ' + fmt(active.p90) + ' yds</span></div>' +
-      '<div class="cell miss-card"><small>If He Misses (Bust/Injury Regime)</small><b class="mono neg">' + fmt(active.miss) + ' yds</b><span class="sub-note">' + pct(active.bust) + ' Bust Risk &middot; Floor: ' + fmt(active.p10) + ' yds</span></div>' +
-    '</div>' +
-    '<table class="tbl"><tr><th>Context</th><th>80% Range (p10&ndash;p90)</th><th>If Hits</th><th>If Miss</th><th>Start</th><th>Boom</th></tr>' +
-    row('Team-Neutral', neutral) + row('Drafted Team' + (p.team ? ' (' + esc(p.team) + ')' : ''), drafted) + '</table>' +
-    '<div class="note">Landing-spot shift on "If He Hits" projection: <span class="mono ' + shiftCls(draftShift) + '">' + (draftShift >= 0 ? '+' : '') + fmt(draftShift) + ' yds</span> (Unconditional mathematical median p50: ' + fmt(active.p50) + ' yds).</div></div>' +
+    '<div class="sec"><h4>3-Year Outcome Comparison</h4>' +
+    '<table class="tbl"><tr><th>Context</th><th>p10 &ndash; p90 Range</th><th>If Hits</th><th>If Miss</th><th>Start</th><th>Boom</th></tr>' +
+    row('Team-Neutral', neutral) +
+    row('Drafted' + (p.team ? ' (' + esc(p.team) + ')' : ''), drafted) +
+    row('What-If (' + esc(m.code) + ')', m) +
+    '</table></div>' +
 
-    outcome +
-
-    '<div class="sec"><h4>Drafted-Team Environment Fit &middot; ' + p.fit.toFixed(2) + 'x</h4><div class="grid3">' +
-    pillar('QB &amp; Volume', p.d_qb) + pillar('Vacancy', p.d_vac) + pillar('Role Fit', p.d_role) + '</div>' +
-    '<div class="note">' + esc(p.notes || 'Balanced Room') + '</div></div>' +
-
-    '<div class="sec"><h4>Play-Style Archetype Distribution</h4>' + mix + '</div>' +
-    '<div class="sec"><h4>Combine &amp; Pro Day Biomechanics</h4>' + ath + '</div>' +
-
-    '<div class="sec"><h4>Mock Landing-Spot Simulator (Class of ' + p.year + ')</h4>' +
-    '<div class="teams">' + teamCodes.map(c => {
+    '<div class="sec"><h4>Quick What-If Team Swap (' + p.year + ' Season)</h4>' +
+    '<div class="teams">' + TEAM_CODES.map(c => {
       const col = (ENVS[c + '_' + p.year] || {}).color || '#3f3f46';
       return '<button class="tb' + (c === st.preview ? ' on' : '') + '" data-team="' + c + '" style="background:' + col + ';color:' + ink(col) + '">' + c + '</button>';
     }).join('') + '</div>' +
-    mockBox +
-    '<div class="acts"><button class="primary" id="btn-apply">Apply Mock to Board</button><button class="btn" id="btn-clear-mock">Clear</button></div>' +
-    '<div class="note">Simulates this prospect in any team\'s exact ' + p.year + ' offensive environment (starting QB EPA, pass volume, vacated targets, and incumbent WR archetype overlap).</div></div>';
+    '<div class="grid3" style="margin-top:8px">' +
+      '<div class="cell"><small>What-If "If Hits"</small><b class="mono acc">' + fmt(m.hit) + ' yds</b></div>' +
+      '<div class="cell"><small>vs Drafted</small><b class="mono ' + shiftCls(mockShift) + '">' + (mockShift >= 0 ? '+' : '') + fmt(mockShift) + ' yds</b></div>' +
+      '<div class="cell"><small>Fit Multiplier</small><b class="mono">' + m.mult.toFixed(2) + 'x</b></div>' +
+    '</div>' +
+    '<div class="note"><b>' + esc(m.team.city) + ' ' + esc(m.team.name) + ' (' + p.year + ')</b> &middot; QB: ' + esc(m.team.qb) + ' &middot; ' + Math.round(m.team.vacated * 100) + '% vacated' + (incNames ? ' &middot; Starters: ' + esc(incNames) : '') + '</div>' +
+    '<div class="acts">' +
+      '<button class="btn primary" id="btn-apply" style="flex:1">Pin to Board</button>' +
+      '<button class="btn" id="btn-open-sim">Open in Full Monte Carlo Lab &rarr;</button>' +
+      '<button class="btn" id="btn-clear-mock">Reset</button>' +
+    '</div></div>' +
+
+    '<div class="sec"><h4>Combine &amp; Biomechanics</h4>' + ath + '</div>';
 }
 
 function openDrawer(id) {
@@ -845,6 +1031,124 @@ function closeDrawer() {
   $('backdrop').style.display = 'none';
 }
 
+// ---- Tab 2: Full Monte Carlo Career Simulator & What-If Lab ------------------
+function populateSimSelectors() {
+  const years = ['all'].concat(META.years.map(String));
+  $('sim-cls-filter').innerHTML = years.map(y => '<option value="' + y + '"' + (y === st.simCls ? ' selected' : '') + '>' + (y === 'all' ? 'All Classes (' + META.years[META.years.length-1] + '–' + META.years[0] + ')' : 'Class of ' + y) + '</option>').join('');
+
+  const filtered = P.filter(p => st.simCls === 'all' || String(p.year) === st.simCls);
+  if (!filtered.some(p => p.id === st.simProspectId) && filtered.length) {
+    st.simProspectId = filtered[0].id;
+    st.simTeam = filtered[0].team || 'KC';
+    st.simYear = filtered[0].year;
+  }
+  $('sim-prospect').innerHTML = filtered.map(p => '<option value="' + p.id + '"' + (p.id === st.simProspectId ? ' selected' : '') + '>' + esc(p.name) + ' (' + p.year + ' · ' + esc(p.college) + ' · Grd ' + p.grade.toFixed(1) + ')</option>').join('');
+  $('sim-env-year').innerHTML = META.years.map(y => '<option value="' + y + '"' + (y === st.simYear ? ' selected' : '') + '>' + y + ' NFL Season Environment</option>').join('');
+}
+
+function renderSimTab() {
+  const p = P.find(x => x.id === st.simProspectId) || P[0];
+  if (!p) return;
+  const m = mockFit(p, st.simTeam, st.simYear);
+  const drafted = { p10: p.s_p10, p50: p.s_p50, p90: p.s_p90, hit: p.s_hit, miss: p.s_miss, starter: p.s_st, boom: p.s_bm, bust: p.s_bu };
+  const deltaHit = m.hit - drafted.hit;
+  const shiftCls = v => (v >= 0 ? 'pos' : 'neg');
+
+  // Render 32-team selector grid
+  $('sim-teams-grid').innerHTML = TEAM_CODES.map(c => {
+    const col = (ENVS[c + '_' + st.simYear] || {}).color || '#3f3f46';
+    return '<button class="tb' + (c === st.simTeam ? ' on' : '') + '" data-simteam="' + c + '" style="background:' + col + ';color:' + ink(col) + '">' + c + '</button>';
+  }).join('');
+
+  // Run live 1,000-trial Monte Carlo simulation in browser
+  const mc = runMonteCarlo1000(m);
+  const maxBin = Math.max(1, ...mc.bins);
+  const binLabels = ['<500', '500–999', '1.0–1.5k', '1.5–2.0k', '2.0–2.5k', '2.5–3.0k', '3.0–3.5k', '3.5–4.0k', '4.0–4.5k', '4.5k+'];
+
+  const histHtml = mc.bins.map((cnt, idx) => {
+    const hPct = Math.max(3, Math.round((cnt / maxBin) * 100));
+    const cls = idx === 0 ? 'bust' : (idx >= 5 ? 'boom' : '');
+    const pctVal = (cnt / 10).toFixed(1) + '%';
+    return '<div class="hbar-col"><div class="hbar ' + cls + '" style="height:' + hPct + '%"><span class="mono">' + pctVal + '</span></div></div>';
+  }).join('');
+
+  if (!st.singleRoll) {
+    st.singleRoll = rollSingleCareer(p, m);
+  }
+  const sr = st.singleRoll;
+  const incNames = (m.team.incumbents || []).map(i => i.name + ' (' + Math.round(i.target_share*100) + '% share)').join(', ');
+
+  $('sim-main-panel').innerHTML =
+    '<div class="sim-card">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:14px">' +
+        '<div>' +
+          '<span class="lbl">Monte Carlo What-If Lab</span>' +
+          '<h2 style="margin:3px 0;font-size:24px;font-weight:800">' + esc(p.name) + ' &rarr; ' + esc(m.team.city) + ' ' + esc(m.team.name) + ' (' + st.simYear + ')</h2>' +
+          '<div class="sub">' + esc(p.college) + ' &middot; ' + esc(p.arch) + ' &middot; College Grade <b>' + p.grade.toFixed(1) + '</b> &middot; Starting QB: <b>' + esc(m.team.qb) + '</b> (' + esc(m.team.style) + ')</div>' +
+        '</div>' +
+        '<div style="text-align:right">' +
+          '<span class="lbl">Team Fit Multiplier</span>' +
+          '<div class="mono" style="font-size:22px;font-weight:800;color:var(--accent)">' + m.mult.toFixed(2) + 'x</div>' +
+        '</div>' +
+      '</div>' +
+
+      /* ---- Top KPI Comparison Row ---- */
+      '<div class="grid3" style="margin-top:14px">' +
+        '<div class="cell"><small>If He Hits (Starter Projection)</small><b class="mono acc">' + fmt(m.hit) + ' yds</b><span class="sub-note">' + (deltaHit >= 0 ? '+' : '') + fmt(deltaHit) + ' yds vs Drafted (' + fmt(drafted.hit) + ')</span></div>' +
+        '<div class="cell"><small>80% Outcome Range (p10&ndash;p90)</small><b class="mono">' + fmt(m.p10) + ' &ndash; ' + fmt(m.p90) + '</b><span class="sub-note">If Misses / Downside: ~' + fmt(m.miss) + ' yds</span></div>' +
+        '<div class="cell"><small>Starter / Boom / Bust Odds</small><b class="mono"><span class="pos">' + pct(m.starter) + '</span> / <span class="acc">' + pct(m.boom) + '</span> / <span class="neg">' + pct(m.bust) + '</span></b><span class="sub-note">Start (&ge;1.5k) · Boom (&ge;2.5k) · Bust (&lt;500)</span></div>' +
+      '</div>' +
+
+      /* ---- 3-Pillar Environment Breakdown ---- */
+      '<div class="grid3" style="margin-top:8px">' +
+        '<div class="cell"><small>Pillar 1: QB &amp; Pass Vol</small><b class="mono ' + shiftCls(m.dQb) + '">' + sgn(m.dQb) + '</b><span class="sub-note">QB: ' + esc(m.team.qb) + '</span></div>' +
+        '<div class="cell"><small>Pillar 2: Vacated Targets</small><b class="mono ' + shiftCls(m.dVac) + '">' + sgn(m.dVac) + '</b><span class="sub-note">' + Math.round(m.team.vacated * 100) + '% prior targets vacated</span></div>' +
+        '<div class="cell"><small>Pillar 3: Depth Chart Fit</small><b class="mono ' + shiftCls(m.dRole) + '">' + sgn(m.dRole) + ' (' + esc(m.roleLabel) + ')</b><span class="sub-note">' + esc(m.notes) + '</span></div>' +
+      '</div>' +
+      (incNames ? '<div class="note">Returning WR/TE Depth Chart (' + st.simYear + '): ' + esc(incNames) + '</div>' : '') +
+
+      /* ---- 1,000-Trial Monte Carlo Distribution Histogram ---- */
+      '<div class="hist-wrap">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+          '<b style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)">1,000-Season Monte Carlo Outcome Distribution (Years 1&ndash;3 Yards)</b>' +
+          '<button class="btn" id="btn-rerun-mc" style="padding:3px 8px;font-size:11px">Re-Run 1,000 Trials</button>' +
+        '</div>' +
+        '<div class="hist-bars">' + histHtml + '</div>' +
+        '<div class="hist-lbls mono">' + binLabels.map(l => '<div>' + l + '</div>').join('') + '</div>' +
+        '<div class="note" style="margin-top:8px">How this works live: Draws 1,000 random normal variates (Box-Muller) in JavaScript and transforms each through ' + esc(p.name) + '\'s split-normal square-root quantile distribution on ' + esc(m.code) + '. Grey = Bust (&lt;500), Blue = Rotational/Starter (500&ndash;2,499), Green = Boom (&ge;2,500).</div>' +
+      '</div>' +
+
+      /* ---- Single-Career Season-by-Season Stat Roller ---- */
+      '<div class="career-box">' +
+        '<div class="career-hdr">' +
+          '<div><span class="lbl">Interactive Career Roller</span><div style="font-weight:700;font-size:15px;margin-top:2px">Simulated 3-Year Rookie Contract on ' + esc(m.code) + '</div></div>' +
+          '<div style="display:flex;gap:8px;align-items:center">' +
+            '<span class="career-tier ' + sr.cls + '">' + sr.outcome + '</span>' +
+            '<button class="btn primary" id="btn-roll-single">Roll New 3-Year Career</button>' +
+          '</div>' +
+        '</div>' +
+        '<table class="tbl mono">' +
+          '<tr><th>Season</th><th>Team</th><th>Receptions</th><th>Receiving Yds</th><th>Yds / Catch</th><th>Rec TDs</th></tr>' +
+          sr.seasons.map((s, idx) => '<tr><td>Year ' + (idx + 1) + ' (' + s.yr + ')</td><td>' + esc(m.code) + '</td><td>' + s.rec + '</td><td><b>' + fmt(s.yds) + '</b></td><td>' + s.ypc + '</td><td>' + s.td + '</td></tr>').join('') +
+          '<tr style="font-weight:800;border-top:2px solid var(--line-hi)"><td>3-Year Total</td><td>' + esc(m.code) + '</td><td>' + sr.totRec + '</td><td class="' + sr.cls + '">' + fmt(sr.totYds) + ' yds</td><td>' + sr.totYpc + '</td><td>' + sr.totTd + '</td></tr>' +
+        '</table>' +
+      '</div>' +
+    '</div>';
+}
+
+function switchTab(tabName) {
+  st.tab = tabName;
+  document.querySelectorAll('#nav-tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tabName));
+  $('tab-board').style.display = tabName === 'board' ? 'block' : 'none';
+  $('tab-sim').style.display = tabName === 'sim' ? 'block' : 'none';
+  if (tabName === 'sim') {
+    populateSimSelectors();
+    renderSimTab();
+  } else {
+    renderBoard();
+  }
+}
+
 function buildChips() {
   const years = ['all'].concat(META.years.map(String));
   $('seg-class').innerHTML = years.map(y => '<button data-cls="' + y + '"' + (y === st.cls ? ' class="on"' : '') + '>' + (y === 'all' ? 'All' : y) + '</button>').join('');
@@ -855,29 +1159,111 @@ function syncControls() {
   $('sel-sort').value = st.sort; $('sel-arch').value = st.arch; $('inp-q').value = st.q;
 }
 
-$('seg-class').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; st.cls = b.dataset.cls; syncControls(); render(); });
-$('seg-view').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; st.view = b.dataset.view; syncControls(); render(); });
-$('sel-sort').addEventListener('change', e => { st.sort = e.target.value; render(); });
-$('sel-arch').addEventListener('change', e => { st.arch = e.target.value; render(); });
-$('inp-q').addEventListener('input', e => { st.q = e.target.value.toLowerCase().trim(); render(); });
-$('btn-reset').addEventListener('click', () => { st.sort = 'grade'; st.view = 'fit'; st.cls = 'all'; st.arch = 'all'; st.q = ''; syncControls(); render(); });
-$('btn-reset-mocks').addEventListener('click', () => { P.forEach(p => { p.mock_fit = null; }); render(); });
+$('nav-tabs').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  switchTab(b.dataset.tab);
+});
+
+$('seg-class').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; st.cls = b.dataset.cls; syncControls(); renderBoard(); });
+$('seg-view').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; st.view = b.dataset.view; syncControls(); renderBoard(); });
+$('sel-sort').addEventListener('change', e => { st.sort = e.target.value; renderBoard(); });
+$('sel-arch').addEventListener('change', e => { st.arch = e.target.value; renderBoard(); });
+$('inp-q').addEventListener('input', e => { st.q = e.target.value.toLowerCase().trim(); renderBoard(); });
+$('btn-reset').addEventListener('click', () => { st.sort = 'grade'; st.view = 'fit'; st.cls = 'all'; st.arch = 'all'; st.q = ''; syncControls(); renderBoard(); });
+$('btn-reset-mocks').addEventListener('click', () => { P.forEach(p => { p.mock_fit = null; }); renderBoard(); });
 $('rows').addEventListener('click', e => { const r = e.target.closest('.row'); if (r) openDrawer(r.dataset.id); });
 $('backdrop').addEventListener('click', closeDrawer);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+// Drawer Events
 $('drawer-body').addEventListener('click', e => {
   const t = e.target.closest('[data-team]');
   if (t) { st.preview = t.dataset.team; renderDrawer(); return; }
   if (e.target.closest('#btn-close')) { closeDrawer(); return; }
-  if (e.target.closest('#btn-apply')) { st.sel.mock_fit = mockFit(st.sel, st.preview); closeDrawer(); render(); return; }
-  if (e.target.closest('#btn-clear-mock')) { st.sel.mock_fit = null; closeDrawer(); render(); }
+  if (e.target.closest('#btn-apply')) { st.sel.mock_fit = mockFit(st.sel, st.preview, st.sel.year); closeDrawer(); renderBoard(); return; }
+  if (e.target.closest('#btn-clear-mock')) { st.sel.mock_fit = null; closeDrawer(); renderBoard(); return; }
+  if (e.target.closest('#btn-open-sim')) {
+    st.simCls = 'all';
+    st.simProspectId = st.sel.id;
+    st.simTeam = st.preview;
+    st.simYear = st.sel.year;
+    st.singleRoll = null;
+    closeDrawer();
+    switchTab('sim');
+  }
+});
+
+// Tab 2 Simulator Events
+$('sim-cls-filter').addEventListener('change', e => {
+  st.simCls = e.target.value;
+  st.singleRoll = null;
+  populateSimSelectors();
+  renderSimTab();
+});
+$('sim-prospect').addEventListener('change', e => {
+  st.simProspectId = e.target.value;
+  const p = P.find(x => x.id === st.simProspectId);
+  if (p) {
+    st.simTeam = p.mock_fit ? p.mock_fit.code : (p.team || 'KC');
+    st.simYear = p.mock_fit ? p.mock_fit.envYear : p.year;
+  }
+  st.singleRoll = null;
+  populateSimSelectors();
+  renderSimTab();
+});
+$('sim-env-year').addEventListener('change', e => {
+  st.simYear = parseInt(e.target.value, 10);
+  st.singleRoll = null;
+  renderSimTab();
+});
+$('sim-teams-grid').addEventListener('click', e => {
+  const b = e.target.closest('[data-simteam]');
+  if (!b) return;
+  st.simTeam = b.dataset.simteam;
+  st.singleRoll = null;
+  renderSimTab();
+});
+$('sim-btn-best').addEventListener('click', () => {
+  const p = P.find(x => x.id === st.simProspectId); if (!p) return;
+  st.simTeam = findExtremeTeam(p, st.simYear, true);
+  st.singleRoll = null;
+  renderSimTab();
+});
+$('sim-btn-worst').addEventListener('click', () => {
+  const p = P.find(x => x.id === st.simProspectId); if (!p) return;
+  st.simTeam = findExtremeTeam(p, st.simYear, false);
+  st.singleRoll = null;
+  renderSimTab();
+});
+$('sim-btn-drafted').addEventListener('click', () => {
+  const p = P.find(x => x.id === st.simProspectId); if (!p) return;
+  st.simTeam = p.team || 'KC';
+  st.simYear = p.year;
+  st.singleRoll = null;
+  populateSimSelectors();
+  renderSimTab();
+});
+$('sim-btn-pin').addEventListener('click', () => {
+  const p = P.find(x => x.id === st.simProspectId); if (!p) return;
+  p.mock_fit = mockFit(p, st.simTeam, st.simYear);
+  switchTab('board');
+});
+$('sim-main-panel').addEventListener('click', e => {
+  const p = P.find(x => x.id === st.simProspectId); if (!p) return;
+  const m = mockFit(p, st.simTeam, st.simYear);
+  if (e.target.closest('#btn-roll-single')) {
+    st.singleRoll = rollSingleCareer(p, m);
+    renderSimTab();
+  } else if (e.target.closest('#btn-rerun-mc')) {
+    renderSimTab();
+  }
 });
 
 $('lastdone').textContent = META.last_complete;
 $('yr-span').textContent = META.years[META.years.length - 1] + '–' + META.years[0];
 buildChips();
 syncControls();
-render();
+renderBoard();
 </script>
 </body>
 </html>
@@ -912,7 +1298,7 @@ def build_rankings_app(
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8")
     print(
-        f"Generated dynamic board with {len(prospects)} prospects across classes "
+        f"Generated dynamic 2-tab board with {len(prospects)} prospects across classes "
         f"{years[-1]}–{years[0]} -> {out.resolve()} ({out.stat().st_size / 1024:.0f} KB)"
     )
     return out

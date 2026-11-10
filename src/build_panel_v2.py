@@ -1,8 +1,18 @@
 """
 College Receiver Game-Panel Builder (`build_panel_v2.py`)
 =========================================================
-Constructs `game_split.parquet` and `panel_v2.parquet` from `receiver_games.parquet`
-and `team_games.parquet` using global parameters from `config.py`.
+Constructs `game_split.parquet`, `panel_v2.parquet`, and `panel_v2_feat.parquet`
+from `receiver_games.parquet` and `team_games.parquet` using global parameters
+from `config.py`.
+
+Key Upgrade for Pre-2015 & Freshman Breakouts:
+  - Previously, a receiver-season was only kept if `train_rec >= 5` (at least 5 catches
+    in the first 2/3 of the regular season), which deleted freshman and injury-return
+    receivers who broke out in the second half of the season + bowl games.
+  - Now keeps any receiver-season with `train_rec >= min_rec` OR full-season `tot_rec >= 6`
+    (or `tot_yds >= 80`), preserving every drafted prospect's full college career.
+  - Automatically chains `run_ratings_and_features()` at the end so `panel_v2_feat.parquet`
+    is never out of sync with `panel_v2.parquet`.
 """
 
 from __future__ import annotations
@@ -20,11 +30,12 @@ from config import (
     RECEIVER_GAMES_PATH,
     TEAM_GAMES_PATH,
 )
+from ratings_and_features import run_ratings_and_features
 
 pl.Config.set_tbl_rows(25)
 
 
-def build_panel_v2() -> pl.DataFrame:
+def build_panel_v2(update_features: bool = True) -> pl.DataFrame:
     rg = pl.read_parquet(RECEIVER_GAMES_PATH)
     tg = pl.read_parquet(TEAM_GAMES_PATH)
 
@@ -60,15 +71,39 @@ def build_panel_v2() -> pl.DataFrame:
     stats = rg.select("game_id", "team", "athlete_id", "name", "rec", "yds", "td")
     team_tot = rg.group_by(["game_id", "team"]).agg(team_yds=pl.col("yds").sum())
     train_games = games.filter(~pl.col("is_test")).select("game_id", "team", "season")
+    all_valid_games = games.select("game_id", "team", "season")
 
-    def build_for_threshold(min_rec: int) -> pl.DataFrame:
-        # A receiver joins his team's group only if he has enough catches in TRAINING games
-        grp = (
+    def build_for_threshold(min_rec: int, include_late_breakouts: bool = False) -> pl.DataFrame:
+        train_grp = (
             stats.join(train_games, on=["game_id", "team"], how="inner")
             .group_by(["season", "team", "athlete_id"])
             .agg(name=pl.col("name").first(), train_rec=pl.col("rec").sum())
-            .filter(pl.col("train_rec") >= min_rec)
         )
+        if include_late_breakouts:
+            full_grp = (
+                stats.join(all_valid_games, on=["game_id", "team"], how="inner")
+                .group_by(["season", "team", "athlete_id"])
+                .agg(
+                    full_name=pl.col("name").first(),
+                    tot_rec=pl.col("rec").sum(),
+                    tot_yds=pl.col("yds").sum(),
+                )
+            )
+            grp = (
+                full_grp.join(train_grp, on=["season", "team", "athlete_id"], how="left")
+                .with_columns(
+                    name=pl.coalesce(["name", "full_name"]),
+                    train_rec=pl.col("train_rec").fill_null(0),
+                )
+                .filter(
+                    (pl.col("train_rec") >= min_rec)
+                    | (pl.col("tot_rec") >= 6)
+                    | (pl.col("tot_yds") >= 80)
+                )
+                .select(["season", "team", "athlete_id", "name", "train_rec"])
+            )
+        else:
+            grp = train_grp.filter(pl.col("train_rec") >= min_rec)
 
         return (
             games.join(grp, on=["season", "team"], how="inner")
@@ -95,43 +130,29 @@ def build_panel_v2() -> pl.DataFrame:
         )
         return round(float(gy["g"].sum() / gy["team_yds"].sum()), 3)
 
-    print("Team-games:", games.height, "| Overall share in test:", round(float(games["is_test"].mean()), 3))
     print(
-        "Postseason share of test games:",
-        round(float((games.filter(pl.col("is_test"))["seasonType"] == "postseason").mean()), 3),
-    )
-
-    print(f"\nRecent season game-split breakdown (>= {CFB_END_YEAR - 4}):")
-    print(
-        games.filter(pl.col("season") >= (CFB_END_YEAR - 4))
-        .group_by("season")
-        .agg(
-            total_team_games=pl.len(),
-            test_games=pl.col("is_test").sum(),
-            test_pct=(pl.col("is_test").mean() * 100.0).round(1),
-        )
-        .sort("season")
+        f"Team-games: {games.height:,} ({games['season'].min()}–{games['season'].max()}) "
+        f"| Overall share in test: {round(float(games['is_test'].mean()), 3)}"
     )
 
     for m in MIN_REC_SENSITIVITY:
-        p = build_for_threshold(m)
-        z = (
-            p.group_by("is_test")
-            .agg(n=pl.len(), zero_share=(pl.col("yds") == 0).mean())
-            .sort("is_test")
-        )
-        print(f"\nmin catches in training games = {m}: rows {p.height}, receivers {p['athlete_id'].n_unique()}")
-        print(z)
+        p = build_for_threshold(m, include_late_breakouts=False)
         print(
-            "share of team receiving yards covered | train:",
-            coverage(p, False),
-            "| test:",
-            coverage(p, True),
+            f"min catches in training games = {m}: rows {p.height:,}, receivers {p['athlete_id'].n_unique():,} "
+            f"| yardage coverage train={coverage(p, False)}, test={coverage(p, True)}"
         )
 
-    panel = build_for_threshold(MIN_REC_TRAIN)
+    panel = build_for_threshold(MIN_REC_TRAIN, include_late_breakouts=True)
     panel.write_parquet(PANEL_V2_PATH)
-    print(f"\nSuccessfully wrote {panel.height} rows to {PANEL_V2_PATH}")
+    print(
+        f"\nSuccessfully wrote {panel.height:,} rows ({panel['season'].min()}–{panel['season'].max()}) "
+        f"to {PANEL_V2_PATH}"
+    )
+
+    if update_features:
+        print("\n--- Computing Step 2 Pregame Ratings & Features (panel_v2_feat.parquet) ---")
+        run_ratings_and_features()
+
     return panel
 
 

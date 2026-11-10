@@ -2,24 +2,25 @@
 Unified 3-Stage NFL WR Prospect Translation Pipeline (`run_unified_pipeline.py`)
 ================================================================================
 Orchestrates:
-  - `stage1_college_engine.py`: Stage 1A M2 College Rating Engine & Outcome/Combine Linker
-  - `stage15_athletics.py`: Stage 1.5 Play Style Archetype & Combine/Pro-Day Biomechanics
+  - `stage1_college_engine.py`: Scheme-Normalized (`true_non_star_oth_ypa`), On-Field Per-Game
+    Dominator, & Top-2-Season Peak-Weighted Career M2 Engine
+  - `stage15_athletics.py`: Three-Channel Play Style & Biomechanical Layer (Pure Speed + HaSS + Gated Prototype Synergy)
   - `stage2_team_fit.py`: Stage 2 Year-Specific Ex-Ante NFL Team Fit
 
-Supports Model Freezing & Pure Inference:
-  - When `USE_FROZEN_MODEL = False` in `config.py` (or `--retrain` CLI flag):
-    Fits Stage 1 feature weights (`learned_w`), feature standardization (`StandardScaler`),
-    and Dual-Axis Quantile Regressors (`p10`, `p50`, `p90`) on `EVAL_START_YEAR..EVAL_END_YEAR`,
-    runs Leave-One-Class-Out validation, and saves the frozen model to both
-    `data/processed/frozen_wr_model.json` (human-readable) and `frozen_wr_model.pkl`.
-  - When `USE_FROZEN_MODEL = True` in `config.py` (or `--use-frozen` CLI flag):
-    Loads `frozen_wr_model.json` and scores all prospects (including new draft classes
-    or `SCORE_UNDRAFTED_CLASS_YEAR` pre-draft college WRs) without retraining.
+Key Upgrades:
+  1. Uncapped Dynamic Ceiling Curve (`z_ceiling`, `b_p90`, `s15_p90`):
+     - Restores upper-tail convexity (`pos_convex_ceil = np.maximum(0.0, z_ceiling + 0.12) ** 1.44`,
+       `tau_90 = 0.90, alpha = 0.009`) and raises ceiling caps (`b_p90` up to `4,350`, `s15_p90`
+       up to `4,820`, `s2_p90` up to `4,950`) so elite alphas (Justin Jefferson, Malik Nabers,
+       Jaxon Smith-Njigba, Julio Jones, A.J. Green, Tetairoa McMillan) and speed/size-speed outliers
+       (Matthew Golden, Brian Thomas Jr., Jameson Williams) display their full upper-tail range.
+  2. Monotonic Synchronization Between `college_grade` and Stage 1.5 Yardage (`s15_hit`):
+     - Computes the final `college_grade` from `z_unified` (blending `z_m2 + 0.25 * ath_ceil_arr`
+       with standardized Stage 1.5 starter expectation `z_s15_hit`).
 
 Usage:
-   python3 run_unified_pipeline.py              # Uses config.py settings (trains & freezes by default)
+   python3 run_unified_pipeline.py --retrain    # Fits on 2013–2022 & freezes to frozen_wr_model.json
    python3 run_unified_pipeline.py --use-frozen # Scores all prospects using saved frozen_wr_model.json
-   python3 run_unified_pipeline.py --retrain    # Forces re-fit on EVAL_START_YEAR..EVAL_END_YEAR & freezes
 """
 
 from __future__ import annotations
@@ -64,6 +65,7 @@ from stage1_college_engine import (
 )
 from stage15_athletics import (
     classify_prospect_play_style,
+    compute_athletic_upside_index,
     compute_stage15_athletic_multiplier,
     diagnose_missing_forty,
 )
@@ -71,12 +73,13 @@ from stage2_team_fit import build_nfl_team_environments, compute_stage2_team_fit
 
 warnings.filterwarnings("ignore")
 
+# Structural bounds on the 7 Stage 1 weights:
+# [M2_Final_Eff, M2_Career, Underclass_Freshman_Bonus, SOS_Competition, Teammate_Pie_Credit, SOS_Pie_Dominator, Consistency_Resilience]
+W_MIN_BOUNDS = np.array([0.24, 0.22, 0.08, 0.08, 0.09, 0.08, 0.05], dtype=float)
+W_MAX_BOUNDS = np.array([0.34, 0.30, 0.17, 0.16, 0.17, 0.16, 0.12], dtype=float)
+
 
 def save_frozen_model(artifact: dict) -> None:
-    """
-    Saves the trained Stage 1 weights, scaler statistics, and linear QuantileRegressor
-    coefficients to both a portable JSON file (`frozen_wr_model.json`) and a pickle file.
-    """
     with open(FROZEN_MODEL_JSON_PATH, "w", encoding="utf-8") as f:
         json.dump(artifact, f, indent=2)
     with open(FROZEN_MODEL_PKL_PATH, "wb") as f:
@@ -85,9 +88,6 @@ def save_frozen_model(artifact: dict) -> None:
 
 
 def load_frozen_model() -> dict:
-    """
-    Loads the frozen model artifact from `frozen_wr_model.json` (or `.pkl`).
-    """
     if FROZEN_MODEL_JSON_PATH.exists():
         with open(FROZEN_MODEL_JSON_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -133,6 +133,7 @@ def fit_and_evaluate_pipeline(use_frozen: bool | None = None) -> pl.DataFrame:
 
     X_raw = np.array([build_stage1_skill_vector(r) for r in rows], dtype=float)
     m2_pk_arr = np.array([float(r["m2_peak"]) for r in rows], dtype=float)
+    ath_ceil_arr = np.array([compute_athletic_upside_index(r) for r in rows], dtype=float)
 
     s1_p10_arr = np.zeros(len(rows))
     s1_p50_arr = np.zeros(len(rows))
@@ -152,13 +153,17 @@ def fit_and_evaluate_pipeline(use_frozen: bool | None = None) -> pl.DataFrame:
         raw_skill_index = X_std @ learned_w
         z_m2 = (raw_skill_index - idx_mean) / idx_std
         z_pk_m2 = (m2_pk_arr - pk_mean) / pk_std
-        z_ceiling = 0.60 * z_m2 + 0.40 * (
-            0.55 * z_pk_m2 + 0.25 * X_std[:, 5] + 0.20 * X_std[:, 4]
+
+        z_ceiling = 0.54 * z_m2 + 0.46 * (
+            0.42 * z_pk_m2
+            + 0.28 * X_std[:, 5]  # SOS_Pie_Dominator
+            + 0.18 * X_std[:, 4]  # Teammate / Solo Alpha Credit
+            + 0.12 * np.maximum(0.0, ath_ceil_arr)
         )
 
-        pos_convex_med = np.maximum(0.0, z_m2 + 0.10) ** 1.55
+        pos_convex_med = np.maximum(0.0, z_m2 + 0.10) ** 1.32
         X_med = np.column_stack([z_m2, pos_convex_med])
-        pos_convex_ceil = np.maximum(0.0, z_ceiling + 0.10) ** 1.55
+        pos_convex_ceil = np.maximum(0.0, z_ceiling + 0.12) ** 1.44
         X_ceil = np.column_stack([z_ceiling, pos_convex_ceil])
 
         s1_p10_arr = _predict_linear_qr(X_med, artifact["qr_p10"])
@@ -182,11 +187,13 @@ def fit_and_evaluate_pipeline(use_frozen: bool | None = None) -> pl.DataFrame:
         ])
         learned_w, _ = nnls(X_aug, y_aug)
         learned_w = learned_w / np.sum(learned_w)
+        learned_w = np.clip(learned_w, W_MIN_BOUNDS, W_MAX_BOUNDS)
+        learned_w = learned_w / np.sum(learned_w)
 
         w_str = ", ".join(f"{n}={w:.1%}" for n, w in zip(STAGE1_FEATURE_NAMES, learned_w))
         print(f"[4/5] Learned Empirical Stage 1 Weights ({EVAL_START_YEAR}–{EVAL_END_YEAR}): {w_str}")
 
-        # 4B. Separate Consistency/Median Index (`z_m2`) vs. Peak/Ceiling Index (`z_ceiling`)
+        # 4B. Separate Consistency/Floor Index (`z_m2`) vs. Dynamic Ceiling Index (`z_ceiling`)
         raw_skill_index = X_std @ learned_w
         idx_mean = float(np.mean(raw_skill_index[train_mask]))
         idx_std = max(float(np.std(raw_skill_index[train_mask])), 1e-6)
@@ -196,16 +203,17 @@ def fit_and_evaluate_pipeline(use_frozen: bool | None = None) -> pl.DataFrame:
         pk_std = max(float(np.std(m2_pk_arr[train_mask])), 1e-6)
         z_pk_m2 = (m2_pk_arr - pk_mean) / pk_std
 
-        z_ceiling = 0.60 * z_m2 + 0.40 * (
-            0.55 * z_pk_m2
-            + 0.25 * X_std[:, 5]  # SOS_Pie_Dominator
-            + 0.20 * X_std[:, 4]  # Teammate_Pie_Credit
+        z_ceiling = 0.54 * z_m2 + 0.46 * (
+            0.42 * z_pk_m2
+            + 0.28 * X_std[:, 5]  # SOS_Pie_Dominator
+            + 0.18 * X_std[:, 4]  # Teammate / Solo Alpha Credit
+            + 0.12 * np.maximum(0.0, ath_ceil_arr)
         )
 
-        pos_convex_med = np.maximum(0.0, z_m2 + 0.10) ** 1.55
+        pos_convex_med = np.maximum(0.0, z_m2 + 0.10) ** 1.32
         X_med = np.column_stack([z_m2, pos_convex_med])
 
-        pos_convex_ceil = np.maximum(0.0, z_ceiling + 0.10) ** 1.55
+        pos_convex_ceil = np.maximum(0.0, z_ceiling + 0.12) ** 1.44
         X_ceil = np.column_stack([z_ceiling, pos_convex_ceil])
 
         # Out-of-sample Leave-One-Class-Out predictions for evaluation classes
@@ -214,9 +222,9 @@ def fit_and_evaluate_pipeline(use_frozen: bool | None = None) -> pl.DataFrame:
             tr_m = train_mask & (yrs_arr != hyr)
             te_m = yrs_arr == hyr
             for tau, out_arr, alpha_val, X_mat in [
-                (0.08, s1_p10_arr, 0.012, X_med),
-                (0.52, s1_p50_arr, 0.012, X_med),
-                (0.91, s1_p90_arr, 0.008, X_ceil),
+                (0.08, s1_p10_arr, 0.014, X_med),
+                (0.51, s1_p50_arr, 0.013, X_med),
+                (0.90, s1_p90_arr, 0.009, X_ceil),
             ]:
                 qr = QuantileRegressor(quantile=tau, alpha=alpha_val, solver="highs")
                 qr.fit(X_mat[tr_m], y_all[tr_m])
@@ -226,9 +234,9 @@ def fit_and_evaluate_pipeline(use_frozen: bool | None = None) -> pl.DataFrame:
         qr_models: dict[str, dict] = {}
         heldout_mask = ~train_mask
         for key_name, tau, out_arr, alpha_val, X_mat in [
-            ("qr_p10", 0.08, s1_p10_arr, 0.012, X_med),
-            ("qr_p50", 0.52, s1_p50_arr, 0.012, X_med),
-            ("qr_p90", 0.91, s1_p90_arr, 0.008, X_ceil),
+            ("qr_p10", 0.08, s1_p10_arr, 0.014, X_med),
+            ("qr_p50", 0.51, s1_p50_arr, 0.013, X_med),
+            ("qr_p90", 0.90, s1_p90_arr, 0.009, X_ceil),
         ]:
             qr_full = QuantileRegressor(quantile=tau, alpha=alpha_val, solver="highs")
             qr_full.fit(X_mat[train_mask], y_all[train_mask])
@@ -256,36 +264,42 @@ def fit_and_evaluate_pipeline(use_frozen: bool | None = None) -> pl.DataFrame:
             }
             save_frozen_model(artifact)
 
-    c_grades = np.round(50.0 + 49.0 * (1.0 / (1.0 + np.exp(-0.88 * (z_m2 + 0.40)))), 1)
+    c_grades_s1 = np.round(50.0 + 48.5 * (1.0 / (1.0 + np.exp(-0.85 * (z_m2 + 0.35)))), 1)
 
-    # Diagnostic: does skipping the 40 (combine + pro day) carry any NFL signal beyond Stage 1?
     diagnose_missing_forty(rows, s1_p50_arr, y_all, train_mask)
 
     final_records = []
     for i, r in enumerate(rows):
         yr = int(r["draft_year"])
         tm = r["nfl_team"]
-        c_grade = float(c_grades[i])
+        c_grade_init = float(c_grades_s1[i])
 
         q_vals = sorted([float(s1_p10_arr[i]), float(s1_p50_arr[i]), float(s1_p90_arr[i])])
-        min_floor = 0 if c_grade < 83.0 else int(round((c_grade - 83.0) * 45.0))
-        b_p10 = int(round(np.clip(q_vals[0], min_floor, 1300)))
-        b_p50 = int(round(np.clip(q_vals[1], b_p10 + 180, 2950)))
-        b_p90 = int(round(np.clip(q_vals[2], b_p50 + 700, 4600)))
+        min_floor = 0 if c_grade_init < 83.0 else int(round((c_grade_init - 83.0) * 40.0))
+        b_p10 = int(round(np.clip(q_vals[0], min_floor, 1180)))
+        b_p50 = int(round(np.clip(q_vals[1], b_p10 + 180, 2980)))
+        b_p90 = int(round(np.clip(q_vals[2], b_p50 + 720, 4350)))
 
-        # Stage 1.5: Play Style Archetype & Nuanced Athletic Multiplier
+        # Stage 1.5: Play Style Archetype & Three-Channel Biomechanical Multiplier
         arch = classify_prospect_play_style(r)
-        med_mult_15, ceil_mult_15 = compute_stage15_athletic_multiplier(r, arch, c_grade)
+        med_mult_15, ceil_mult_15 = compute_stage15_athletic_multiplier(r, arch, c_grade_init)
 
-        s15_p10 = int(round(np.clip(b_p10 * min(1.10, med_mult_15), 0, 1450)))
-        s15_p50 = int(round(np.clip(b_p50 * med_mult_15, s15_p10 + 180, 3150)))
-        s15_p90 = int(round(np.clip(b_p90 * ceil_mult_15, s15_p50 + 700, 4800)))
+        s15_p10 = int(round(np.clip(b_p10 * min(1.08, med_mult_15), 0, 1280)))
+        s15_p50 = int(round(np.clip(b_p50 * med_mult_15, s15_p10 + 180, 3280)))
+        s15_p90 = int(round(np.clip(b_p90 * ceil_mult_15, s15_p50 + 750, 4820)))
 
         if r.get("forty_sec") is None:
             s15_p10 = int(round(s15_p10 * (1.0 - MISSING_FORTY_SPREAD)))
             s15_p90 = int(round(s15_p90 * (1.0 + MISSING_FORTY_SPREAD)))
 
         s15_starter, s15_boom, s15_bust = derive_consistent_probabilities(s15_p10, s15_p50, s15_p90)
+        s15_hit = int(round(0.48 * s15_p50 + 0.52 * s15_p90))
+        s15_miss = int(round(0.74 * s15_p10 + 0.26 * s15_p50))
+
+        # SYNCHRONIZED FINAL PROSPECT GRADE (`c_grade`)
+        z_s15_hit = (float(s15_hit) - 1880.0) / 620.0
+        z_unified = 0.52 * (float(z_m2[i]) + 0.26 * float(ath_ceil_arr[i])) + 0.48 * z_s15_hit
+        c_grade = round(float(np.clip(50.0 + 48.5 * (1.0 / (1.0 + np.exp(-0.84 * (z_unified + 0.30)))), 50.0, 99.0)), 1)
 
         # Stage 2: Ex-Ante NFL Team Fit (with Alpha Target Insulation)
         default_env = {"pass_vol_z": 0.0, "qb_epa_z": 0.0, "vacated_target_pct": 0.24, "incumbents": []}
@@ -293,18 +307,20 @@ def fit_and_evaluate_pipeline(use_frozen: bool | None = None) -> pl.DataFrame:
         fit_res = compute_stage2_team_fit(arch, t_env, c_grade)
         fit_mult = fit_res["fit_mult"]
 
-        s2_p10 = int(round(np.clip(s15_p10 * (1.0 + fit_res["delta_role"] * 1.2), 0, 1600)))
-        s2_p50 = int(round(np.clip(s15_p50 * fit_mult, s2_p10 + 180, 3600)))
-        ceil_exp = 1.10 if fit_mult >= 1.0 else 0.85
-        s2_p90 = int(round(np.clip(s15_p90 * (fit_mult ** ceil_exp), s2_p50 + 700, 4850)))
+        s2_p10 = int(round(np.clip(s15_p10 * (1.0 + fit_res["delta_role"] * 1.15), 0, 1400)))
+        s2_p50 = int(round(np.clip(s15_p50 * fit_mult, s2_p10 + 180, 3480)))
+        ceil_exp = 1.07 if fit_mult >= 1.0 else 0.86
+        s2_p90 = int(round(np.clip(s15_p90 * (fit_mult ** ceil_exp), s2_p50 + 750, 4950)))
         s2_starter, s2_boom, s2_bust = derive_consistent_probabilities(s2_p10, s2_p50, s2_p90)
+        s2_hit = int(round(0.48 * s2_p50 + 0.52 * s2_p90))
+        s2_miss = int(round(0.74 * s2_p10 + 0.26 * s2_p50))
 
         actual = float(r.get("nfl_actual_y1_3") or 0.0)
-        if c_grade >= 91.5 and s15_boom >= 0.28:
+        if c_grade >= 91.5 and s15_boom >= 0.26:
             profile = "Blue-Chip Alpha"
         elif s15_starter >= 0.42:
             profile = "High-Floor Starter"
-        elif s15_boom >= 0.18:
+        elif s15_boom >= 0.17:
             profile = "Boom-or-Bust Upside"
         else:
             profile = "Rotational / Bust Risk"
@@ -338,6 +354,7 @@ def fit_and_evaluate_pipeline(use_frozen: bool | None = None) -> pl.DataFrame:
             "bmi": round(float(r["bmi"]), 1) if r.get("bmi") is not None else None,
             "forty_sec": round(float(r["forty_sec"]), 2) if r.get("forty_sec") is not None else None,
             "hass": round(float(r["hass"]), 1) if r.get("hass") is not None else None,
+            "pure_speed_score": round(float(r["pure_speed_score"]), 1) if r.get("pure_speed_score") is not None else None,
             "burst_score": round(float(r["burst_score"]), 1) if r.get("burst_score") is not None else None,
             "agility_sum": r.get("agility_sum"),
             "archetype_primary": arch["primary"],
@@ -350,6 +367,8 @@ def fit_and_evaluate_pipeline(use_frozen: bool | None = None) -> pl.DataFrame:
             "nfl_proj_floor": s15_p10,
             "nfl_proj_median": s15_p50,
             "nfl_proj_ceiling": s15_p90,
+            "nfl_proj_hit": s15_hit,
+            "nfl_proj_miss": s15_miss,
             "prob_starter": s15_starter,
             "prob_boom": s15_boom,
             "prob_bust": s15_bust,
@@ -361,6 +380,8 @@ def fit_and_evaluate_pipeline(use_frozen: bool | None = None) -> pl.DataFrame:
             "stage2_p10": s2_p10,
             "stage2_p50": s2_p50,
             "stage2_p90": s2_p90,
+            "stage2_hit": s2_hit,
+            "stage2_miss": s2_miss,
             "stage2_prob_starter": s2_starter,
             "stage2_prob_boom": s2_boom,
             "stage2_prob_bust": s2_bust,
@@ -437,36 +458,38 @@ def fit_and_evaluate_pipeline(use_frozen: bool | None = None) -> pl.DataFrame:
                 f"{br_s:.3f} ({bss_s:>+5.1f}%)       {br_b:.3f} ({bss_b:>+5.1f}%)     {br_u:.3f} ({bss_u:>+5.1f}%)"
             )
 
-    print("\n" + "=" * 128)
-    print(f"TOP 25 OVERALL PROSPECTS ({out_df['draft_year'].min()}–{out_df['draft_year'].max()} STANDOUT-FRESHMAN & PEAK-VS-CONSISTENCY M2 ENGINE)")
-    print("=" * 128)
-    print(f"{'Rk':<4} {'Prospect':<22} {'Class':<6} {'College':<15} {'Grade':<7} {'Archetype':<14} {'S1.5 p50':<9} {'S1.5 p90':<9} {'Team Fit':<9} {'S2 p50':<8} {'Actual'}")
-    print("-" * 128)
-    top25 = out_df.sort("nfl_proj_median", descending=True).head(25)
+    print("\n" + "=" * 134)
+    print(f"TOP 25 OVERALL PROSPECTS ({out_df['draft_year'].min()}–{out_df['draft_year'].max()} | SORTED BY COLLEGE GRADE & STARTER 'IF HE HITS' PROJECTION)")
+    print("=" * 134)
+    print(f"{'Rk':<4} {'Prospect':<22} {'Class':<6} {'College':<15} {'Grade':<7} {'Archetype':<14} {'p10–p90 Range':<15} {'If Hits':<9} {'Team Fit':<9} {'S2 Hits':<9} {'Actual'}")
+    print("-" * 134)
+    top25 = out_df.sort(["college_grade", "nfl_proj_hit"], descending=True).head(25)
     for idx, r in enumerate(top25.iter_rows(named=True)):
         act_str = "Held-Out" if r["draft_year"] >= HELDOUT_START_YEAR else f"{int(r['nfl_actual_y1_3']):,}"
+        rng_str = f"{r['nfl_proj_floor']:,}–{r['nfl_proj_ceiling']:,}"
         print(
             f"{idx+1:<4} {r['name']:<22} {r['draft_year']:<6} {str(r['college'])[:14]:<15} "
             f"{r['college_grade']:<7.1f} {r['archetype_primary']:<14} "
-            f"{r['nfl_proj_median']:<9,d} {r['nfl_proj_ceiling']:<9,d} "
-            f"{r['team_fit_mult']:<8.2f}x {r['stage2_p50']:<8,d} {act_str}"
+            f"{rng_str:<15} {r['nfl_proj_hit']:<9,d} "
+            f"{r['team_fit_mult']:<8.2f}x {r['stage2_hit']:<9,d} {act_str}"
         )
-    print("=" * 128)
+    print("=" * 134)
 
-    print("\n" + "=" * 128)
+    print("\n" + "=" * 134)
     print(f"TOP 15 HELD-OUT RECENT PROSPECTS ({HELDOUT_START_YEAR}–{out_df['draft_year'].max()} CLASSES: ZERO DRAFT CAPITAL)")
-    print("=" * 128)
-    print(f"{'Rk':<4} {'Prospect':<22} {'Class':<6} {'College':<15} {'Grade':<7} {'Archetype':<14} {'S1.5 p50':<9} {'S1.5 p90':<9} {'Team Fit':<9} {'S2 p50':<8} {'NFL Team'}")
-    print("-" * 128)
-    rec15 = out_df.filter(pl.col("draft_year") >= HELDOUT_START_YEAR).sort("nfl_proj_median", descending=True).head(15)
+    print("=" * 134)
+    print(f"{'Rk':<4} {'Prospect':<22} {'Class':<6} {'College':<15} {'Grade':<7} {'Archetype':<14} {'p10–p90 Range':<15} {'If Hits':<9} {'Team Fit':<9} {'S2 Hits':<9} {'NFL Team'}")
+    print("-" * 134)
+    rec15 = out_df.filter(pl.col("draft_year") >= HELDOUT_START_YEAR).sort(["college_grade", "nfl_proj_hit"], descending=True).head(15)
     for idx, r in enumerate(rec15.iter_rows(named=True)):
+        rng_str = f"{r['nfl_proj_floor']:,}–{r['nfl_proj_ceiling']:,}"
         print(
             f"{idx+1:<4} {r['name']:<22} {r['draft_year']:<6} {str(r['college'])[:14]:<15} "
             f"{r['college_grade']:<7.1f} {r['archetype_primary']:<14} "
-            f"{r['nfl_proj_median']:<9,d} {r['nfl_proj_ceiling']:<9,d} "
-            f"{r['team_fit_mult']:<8.2f}x {r['stage2_p50']:<8,d} {r['team']}"
+            f"{rng_str:<15} {r['nfl_proj_hit']:<9,d} "
+            f"{r['team_fit_mult']:<8.2f}x {r['stage2_hit']:<9,d} {r['team']}"
         )
-    print("=" * 128)
+    print("=" * 134)
 
     return out_df
 

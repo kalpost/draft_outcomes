@@ -86,23 +86,24 @@ APP_HTML_OUT_PATH = ROOT_DIR / "index.html"
 # ==============================================================================
 # 2. GLOBAL SEASON, COHORT & FREEZE FLAGS
 # ==============================================================================
-# College football data window (starts 4 years before DRAFT_START_YEAR so 2009
-# seniors have full chronological freshman-to-senior histories).
-CFB_START_YEAR: int = 2005
+# College football data window (2004 is the first season of CFBD player box scores
+# and covers Calvin Johnson's full 2004–2006 Georgia Tech career).
+CFB_START_YEAR: int = 2004
 CFB_END_YEAR: int = 2026
 
 # Include both FBS and FCS so small-school NFL draftees (Cooper Kupp, Christian Watson, etc.) are linked.
 CFB_DIVISIONS: tuple[str, ...] = ("fbs", "fcs")
 
-# NFL Draft classes covered by the pipeline (2009–2026)
-DRAFT_START_YEAR: int = 2009
+# NFL Draft classes covered in the product (2007–2026, starting with Calvin Johnson's 2007 class)
+DRAFT_START_YEAR: int = 2007
 DRAFT_END_YEAR: int = 2026
 
 # Latest completed NFL regular season in `nfl_stats_player.parquet`
 COMPLETED_NFL_SEASON: int = 2026
-NFL_PULL_START_YEAR: int = DRAFT_START_YEAR - 1  # 2008 (needed for 2009 ex-ante team environments)
+NFL_PULL_START_YEAR: int = DRAFT_START_YEAR - 1  # 2006 (needed for 2007 ex-ante team environments)
 
 # Evaluation / Training cohort window (model weights strictly learned on 2013–2022)
+# This keeps the model training pure while allowing 2007–2012 and 2023–2026 to be scored as inference!
 EVAL_START_YEAR: int = 2013
 EVAL_END_YEAR: int = 2022
 HELDOUT_START_YEAR: int = EVAL_END_YEAR + 1
@@ -113,12 +114,12 @@ HELDOUT_START_YEAR: int = EVAL_END_YEAR + 1
 #   - USE_FROZEN_MODEL: Set to True once you have trained & frozen the model and want subsequent
 #     runs to score prospects strictly through the saved frozen artifact without re-fitting.
 #   - SCORE_UNDRAFTED_CLASS_YEAR: Optional int (e.g., `2027`). When set (not None), automatically
-#     appends eligible college WRs from `CFB_END_YEAR` who are not yet in `wr_links_final.parquet`
-#     as pre-draft prospects for that draft year (`MIN_UNDRAFTED_SEASON_YDS = 500`).
+#     appends eligible FBS college WRs from `CFB_END_YEAR` who are not yet in `wr_links_final.parquet`
+#     as pre-draft prospects for that draft year (`MIN_UNDRAFTED_SEASON_YDS = 550`).
 FREEZE_ON_TRAIN: bool = True
 USE_FROZEN_MODEL: bool = False
 SCORE_UNDRAFTED_CLASS_YEAR: int | None = 2027
-MIN_UNDRAFTED_SEASON_YDS: int = 500
+MIN_UNDRAFTED_SEASON_YDS: int = 550
 
 # Maximum years prior to `draft_year` to search for a player's college seasons
 CFB_LINK_LOOKBACK_YEARS: int = 5
@@ -144,6 +145,10 @@ TWEEDIE_KC: float = 100.0
 TWEEDIE_KD: float = 300.0
 
 # Stage 1 Empirical Weight Learning Prior & Regularization
+# Anchors weight distribution so Final-Season Ascension/Efficiency (`M2_Final_Eff`),
+# Multi-Season Career Consistency (`M2_Career`), and Complete 3-Level Dominator (`SOS_Pie_Dominator`)
+# drive >=58% of the skill index, preventing `Underclass_Freshman_Bonus` from over-inflating
+# 1-year wonders or early-peak stagnators (e.g., Devin Thomas, Sidney Rice, Dwayne Jarrett).
 STAGE1_FEATURE_NAMES: list[str] = [
     "M2_Final_Eff",
     "M2_Career",
@@ -153,8 +158,8 @@ STAGE1_FEATURE_NAMES: list[str] = [
     "SOS_Pie_Dominator",
     "Consistency_Resilience",
 ]
-STAGE1_PRIOR_WEIGHTS: tuple[float, ...] = (0.30, 0.18, 0.20, 0.12, 0.10, 0.06, 0.04)
-STAGE1_NNLS_LAMBDA: float = 45.0
+STAGE1_PRIOR_WEIGHTS: tuple[float, ...] = (0.26, 0.23, 0.16, 0.10, 0.11, 0.09, 0.05)
+STAGE1_NNLS_LAMBDA: float = 180.0
 
 # Pro Day 40-yard dash adjustment (seconds added when backfilling a missing
 # electronic Combine 40 with a Pro Day 40; set to 0.03s standard convention)
@@ -231,6 +236,7 @@ SCHOOL_ALIASES: dict[str, str] = {
     "stephen f austin": "stephen f austin",
     "sam houston state": "sam houston",
     "appalachian state": "app state",
+    "georgia tech": "georgia tech",
 }
 
 NFL_TEAM_NORM: dict[str, str] = {
