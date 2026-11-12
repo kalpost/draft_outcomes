@@ -1,38 +1,26 @@
 """
 Stage 1A & 1B: New M2 College Rating Engine & Outcome/Combine Linker (`stage1_college_engine.py`)
 =================================================================================================
-Key Upgrades Separating True NFL Superstars (Calvin Johnson, Ja'Marr Chase, Julio Jones,
-A.J. Green, Justin Jefferson, Jaxon Smith-Njigba, CeeDee Lamb, Marvin Harrison Jr., Malik Nabers,
-Garrett Wilson, Tetairoa McMillan, Jeremiah Smith) from One-Year Wonders & System Compilers:
+Key Upgrades:
+  1. Eliminating the "Historic Offense Denominator Penalty" (`eff_denom_team_yds` & `eff_denom_team_td`):
+     - Previously, in historic high-YPA offenses (e.g. 2019 LSU throwing for 5,671 yds & 60 TDs with
+       Joe Burrow; 2013 Texas A&M throwing for 4,593 yds & 39 TDs with Johnny Manziel; 2018–2019
+       Oklahoma with Kyler Murray/Jalen Hurts; 2012 Clemson with Tajh Boyd; 2023 LSU with Jayden Daniels),
+       dividing a receiver's yards and TDs by raw `team_pass_yds` and `team_rec_td` penalized stars for
+       their QB's extreme YPA (`10.8 YPA` at 2019 LSU gave Justin Jefferson's `1,540 yds & 18 TDs` only
+       a `28.5%` raw dominator!).
+     - Now caps the team yardage denominator at a normal `8.05 YPA` baseline (`denom_team_att * 8.05`)
+       and the team TD denominator at a normal `6.6% TD/att` baseline (`denom_team_att * 0.066`).
+     - This stops punishing Justin Jefferson, CeeDee Lamb, Mike Evans, DeAndre Hopkins, and Malik Nabers
+       for playing in historic high-YPA offenses, while STILL penalizing high-attempt Air Raid offenses
+       (like Washington State throwing 53 times/game for Marquess Wilson or West Virginia throwing 44
+       times/game for Stedman Bailey) because `denom_team_att` remains high!
 
-  1. Restoring Elite College Offenses (One-Sided Bad-QB Rescue `qb_rescue_norm >= 1.0`):
-     - In the previous pass, `qb_scheme_norm = (6.85 / true_non_star_oth_ypa) ** 0.56` penalized
-       receivers by `-15%` to `-17%` whenever their team had a great QB (`true_non_star_oth_ypa > 7.0`),
-       which unfairly slashed **Justin Jefferson & Ja'Marr Chase (Joe Burrow)**, **Malik Nabers &
-       Brian Thomas Jr. (Jayden Daniels)**, **CeeDee Lamb (Baker Mayfield / Kyler Murray)**, and
-       **JSN / Garrett Wilson / Chris Olave (C.J. Stroud)**!
-     - Now `qb_rescue_norm` is strictly **one-sided (`>= 1.0`)**: it rescues alphas carrying inept
-       or run-heavy passing offenses (`true_non_star_oth_ypa < 6.45`: Calvin Johnson w/ Reggie Ball,
-       Julio Jones at 2008–2009 Alabama, A.J. Green at 2008–2010 Georgia, Tetairoa McMillan at 2024
-       Arizona) while NEVER punishing LSU, Ohio State, Oklahoma, or Alabama receivers for having
-       elite QBs!
-
-  2. Fixing the Sophomore Superstar + Junior Injury Trap (`Jaxon Smith-Njigba` vs `Devin Thomas` / `KJ Duff`):
-     - Previously, because JSN played a small freshman role in 2020 (COVID) behind Wilson & Olave,
-       exploded for 1,606 yds as a True Sophomore in 2021, and missed 2022 with a hamstring injury
-       (`3 games`), `valid_seasons` dropped 2020 and 2022—causing the code to see `active_starter_seasons == 1`
-       and hit JSN with `one_year_wonder_pen`, 30% career shrinkage, AND `had_short_final_year`!
-     - Now explicitly distinguishes **Early-Breakout Sophomore/Freshman Superstars (`has_early_superstar_season`,
-       where a `>= 950 yd` or `>= 2.45 M2` season happened at `season <= draft_year - 2`)** from
-       **Final-Year-Only One-Year Wonders** (`Devin Thomas`, `Kevin White`, 1-year 2026 breakouts like `KJ Duff`).
-
-  3. Era- & Pass-Rate-Normalized Per-Game Output (`adj_yds_per_g` & `adj_rec_per_g`) + Senior Discount:
-     - Normalizes `yds_per_game` and `rec_per_game` for team pass-attempt rate so `88–95 yds/g` in a
-       23-attempt/game 2008–2010 SEC offense (**Julio Jones, A.J. Green, Calvin Johnson**) is evaluated
-       on the exact same scale as `110+ yds/g` in a 35-attempt/game modern spread offense.
-     - Discounts 4th/5th-year senior seasons (`season_idx >= 4`) by `0.88x` so 22-year-old seniors
-       compiling stats against 19-year-old DBs (**Stedman Bailey, Tyler Johnson, Terrance Williams,
-       Leonte Carroo**) do not jump ahead of true 3-year underclassman alphas.
+  2. Dynamic Multi-Season Trajectory & Air-Raid Attempt Deflation:
+     - Deflates high-attempt Air Raid volume (`team_pass_att_per_g > 37.5`, e.g. Washington State &
+       West Virginia) and penalizes final-season walk-offs/regressions (Marquess Wilson 2012).
+     - Removes the 0.58 redshirt-freshman penalty when a 2-season Power-4 alpha averages `>= 85 yds/g`
+       in both seasons (Mike Evans at Texas A&M: `1,105 yds` in 2012 and `1,394 yds` in 2013).
 """
 
 from __future__ import annotations
@@ -153,7 +141,7 @@ def append_undrafted_college_prospects(links_df: pl.DataFrame) -> pl.DataFrame:
 
 def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
     """
-    Computes Era-Normalized, Bad-QB-Rescued, On-Field Per-Game Dominator,
+    Computes Era-Normalized, Bad-QB-Rescued, Historic-Offense-Fair, On-Field Per-Game Dominator,
     and Sustained Power-Alpha M2 Ratings across all college receiver-games.
     """
     _ensure_panel_synced()
@@ -295,9 +283,9 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
             ).clip(0.0, 0.75),
             is_tough_def=(pl.col("def_rating") <= def_q25),
             is_fbs=(pl.col("opp_class") == "fbs").fill_null(True),
-            # Stronger pace deflator above 36 pass attempts/game to strip out pure Air Raid attempt volume
-            # (West Virginia 2012, Texas Tech, Washington St.) without hurting 30-34 att/g pro-spread teams (LSU, Ohio St.)
-            pace_deflator=(35.5 / pl.col("pass_att").clip(lower_bound=35.5)) ** 0.42,
+            # Only deflate extreme Air Raid attempt games (> 39 pass attempts/game, e.g. Washington St / West Virginia / Texas Tech),
+            # NOT normal 32-38 att/g pro-spread games (2019 LSU, 2012 Clemson, 2013 Texas A&M)!
+            pace_deflator=(39.0 / pl.col("pass_att").clip(lower_bound=39.0)) ** 0.45,
         )
         .with_columns(
             adj_game_yptpa=(
@@ -366,7 +354,7 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
             eff_opp_elo=pl.when(pl.col("s_fbs_share").fill_null(1.0) < 0.45)
             .then(pl.coalesce(["rs_opp_elo", "program_opp_elo", "prog_elo_fb"]).fill_null(1240.0).clip(upper_bound=1340.0))
             .otherwise(pl.coalesce(["rs_opp_elo", "program_opp_elo", "prog_elo_fb"]).fill_null(1260.0)),
-            denom_team_yds=pl.coalesce(["true_team_pass_yds", "rs_team_yds"]).clip(lower_bound=1750.0),
+            raw_denom_team_yds=pl.coalesce(["true_team_pass_yds", "rs_team_yds"]).clip(lower_bound=1750.0).cast(pl.Float64),
             denom_team_att=pl.coalesce(["true_team_pass_att", "rs_team_att"]).clip(lower_bound=240).cast(pl.Float64),
             eff_games_share=(
                 pl.coalesce(["rs_games", "s_active_games"]).clip(lower_bound=1).cast(pl.Float64)
@@ -378,20 +366,44 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
             ).fill_null(30.0),
         )
         .with_columns(
+            # ELIMINATE THE HISTORIC-OFFENSE DENOMINATOR PENALTY:
+            # In historic high-YPA offenses (2019 LSU w/ Joe Burrow `10.8 YPA, 60 TDs`, 2013 Texas A&M
+            # w/ Manziel `9.6 YPA`, 2018-19 Oklahoma `10.5 YPA`, 2012 Clemson w/ Boyd, 2023 LSU w/ Daniels),
+            # cap the yardage denominator at `denom_team_att * 8.05` (with a 30% slope above 8.05 YPA) and
+            # the TD denominator at `denom_team_att * 0.065` (with a 30% slope above).
+            # High-attempt Air Raid teams (Washington St `53 att/g`, West Virginia `43 att/g`) still have
+            # a huge `denom_team_att`, so they get NO boost, while Justin Jefferson, Mike Evans, DeAndre Hopkins,
+            # CeeDee Lamb, and Malik Nabers are no longer penalized for playing with Heisman QBs!
+            denom_team_yds=pl.when(pl.col("raw_denom_team_yds") > pl.col("denom_team_att") * 8.05)
+            .then(
+                pl.col("denom_team_att") * 8.05
+                + 0.30 * (pl.col("raw_denom_team_yds") - pl.col("denom_team_att") * 8.05)
+            )
+            .otherwise(pl.col("raw_denom_team_yds")),
+            denom_team_td=pl.when(
+                pl.col("true_team_rec_td").fill_null(14).cast(pl.Float64) > pl.col("denom_team_att") * 0.065
+            )
+            .then(
+                pl.col("denom_team_att") * 0.065
+                + 0.30 * (pl.col("true_team_rec_td").fill_null(14).cast(pl.Float64) - pl.col("denom_team_att") * 0.065)
+            )
+            .otherwise(pl.col("true_team_rec_td").fill_null(14).cast(pl.Float64)),
+        )
+        .with_columns(
             calc_yds_share=(
                 pl.col("s_yds")
                 / (pl.col("denom_team_yds") * pl.col("eff_games_share").clip(lower_bound=0.55)).clip(lower_bound=1050.0)
             ).clip(0.02, 0.62),
             calc_td_share=(
                 pl.col("s_td")
-                / (pl.col("true_team_rec_td").fill_null(14).cast(pl.Float64) * pl.col("eff_games_share").clip(lower_bound=0.55)).clip(lower_bound=6.0)
+                / (pl.col("denom_team_td") * pl.col("eff_games_share").clip(lower_bound=0.55)).clip(lower_bound=6.0)
             ).clip(0.0, 0.76),
             raw_co_star_nfl_wrs=(pl.col("room_active_nfl_wrs").fill_null(0.0) - pl.col("self_nfl_wt").fill_null(0.0)).clip(0.0, 3.0),
             co_star_nfl_yds=(pl.col("room_nfl_wr_yds").fill_null(0.0) - pl.col("self_weighted_yds").fill_null(0.0)).clip(lower_bound=0.0),
             co_star_nfl_rec=(pl.col("room_nfl_wr_rec").fill_null(0.0) - pl.col("self_weighted_rec").fill_null(0.0)).clip(lower_bound=0.0),
         )
         .with_columns(
-            non_star_oth_yds=(pl.col("denom_team_yds") - pl.col("s_yds") - pl.col("co_star_nfl_yds")).clip(lower_bound=150.0),
+            non_star_oth_yds=(pl.col("raw_denom_team_yds") - pl.col("s_yds") - pl.col("co_star_nfl_yds")).clip(lower_bound=150.0),
             non_star_oth_att=(
                 pl.col("denom_team_att") - 1.52 * (pl.col("s_rec").cast(pl.Float64) + pl.col("co_star_nfl_rec"))
             ).clip(lower_bound=60.0),
@@ -407,11 +419,11 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
             .otherwise(pl.max_horizontal(pl.col("rs_yds_share").fill_null(0.0), pl.col("calc_yds_share")))
             .clip(0.02, 0.62),
             eff_dominator=pl.when(pl.col("team_pass_att_per_g") < 17.5)
-            .then(0.64 * pl.col("calc_yds_share") + 0.36 * pl.col("calc_td_share"))
+            .then(0.62 * pl.col("calc_yds_share") + 0.38 * pl.col("calc_td_share"))
             .otherwise(
                 pl.max_horizontal(
                     pl.col("rs_dominator").fill_null(0.0),
-                    0.64 * pl.col("calc_yds_share") + 0.36 * pl.col("calc_td_share"),
+                    0.62 * pl.col("calc_yds_share") + 0.38 * pl.col("calc_td_share"),
                 )
             ).clip(0.02, 0.65),
             raw_rec_per_game=(pl.col("s_rec") / pl.col("s_games").clip(lower_bound=1)),
@@ -420,9 +432,10 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
             season_ypc=(pl.col("s_yds") / pl.col("s_rec").clip(lower_bound=1)),
             era_att_baseline=pl.when(pl.col("season") <= 2012).then(16.5).otherwise(20.0),
             # Pass-Rate Normalizer (`pro_style_vol_scale`):
-            # In run-first pro-style offenses (2004–2012 Georgia Tech, Alabama, Georgia throwing 21–25 att/g),
-            # 85 yds/g and 5.5 rec/g is equivalent to 105 yds/g and 6.8 rec/g in a 34-att/g spread offense!
-            pro_style_vol_scale=((31.5 / pl.col("team_pass_att_per_g").clip(20.5, 38.0)) ** 0.45).clip(0.90, 1.22),
+            # Boosts per-game output in <28 att/g run-first offenses (Julio Jones, A.J. Green, Calvin Johnson)
+            # AND deflates per-game output in >38 att/g extreme Air Raid offenses (Washington St / Marquess Wilson,
+            # West Virginia / Stedman Bailey)!
+            pro_style_vol_scale=((32.0 / pl.col("team_pass_att_per_g").clip(20.5, 48.0)) ** 0.45).clip(0.82, 1.22),
         )
         .with_columns(
             rec_per_game=(pl.col("raw_rec_per_game") * pl.col("pro_style_vol_scale")),
@@ -431,7 +444,7 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
                 ((pl.col("team_pass_att_per_g") - pl.col("era_att_baseline")) / 13.0).clip(0.25, 1.0) ** 1.30
             ),
             raw_co_star_yds_share=(
-                pl.col("co_star_nfl_yds") / pl.col("denom_team_yds")
+                pl.col("co_star_nfl_yds") / pl.col("raw_denom_team_yds")
             ).clip(0.0, 0.55),
         )
         .with_columns(
@@ -440,13 +453,11 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
         )
         .with_columns(
             pie_adj_dominator=(
-                pl.col("eff_dominator") / (1.0 - 0.68 * pl.col("co_star_yds_share")).clip(lower_bound=0.56)
-            ).clip(0.04, 0.66),
+                pl.col("eff_dominator") / (1.0 - 0.65 * pl.col("co_star_yds_share")).clip(lower_bound=0.58)
+            ).clip(0.04, 0.65),
         )
     )
 
-    # Track chronological season index (1st, 2nd, 3rd, 4th+ college season) per athlete
-    # so 4th/5th-year senior seasons are discounted relative to true underclassman seasons!
     first_s_lookup = (
         season_panel_agg.group_by("athlete_id")
         .agg(first_s=pl.col("season").min())
@@ -469,22 +480,20 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
                 global_med_yptpa / pl.col("season_med_yptpa").fill_null(global_med_yptpa).clip(1.65, 2.45)
             ).clip(0.92, 1.18),
             sos_bonus_gate=((pl.col("eff_opp_elo") - 1340.0) / 220.0).clip(0.20, 1.15),
-            # ONE-SIDED BAD-QB RESCUE (`qb_rescue_norm >= 1.0`):
-            # Rescues alphas carrying inept passing offenses (`true_non_star_oth_ypa < 6.55`: Calvin Johnson
-            # w/ Reggie Ball `4.65`, Julio Jones at 2008-09 Alabama `5.75`, A.J. Green at Georgia `5.95`),
-            # while NEVER penalizing LSU (Burrow/Daniels), Ohio State (Stroud), Oklahoma (Mayfield/Murray),
-            # or Alabama (Tua/Mac Jones) for having great QBs!
             qb_rescue_norm=pl.when(pl.col("true_non_star_oth_ypa") < 6.55)
             .then(((6.60 / pl.col("true_non_star_oth_ypa")) ** 0.52).clip(1.0, 1.24))
             .otherwise(1.0),
             rec_vol_gate=pl.when(pl.col("raw_rec_per_game") < 3.6)
             .then(((pl.col("raw_rec_per_game") - 1.2) / 2.4).clip(0.50, 1.0))
             .otherwise(1.0),
-            # 4th/5th-Year Senior Age Discount (`senior_yr_discount`):
-            # Discounts stats compiled in Year 4+ of college (e.g. Stedman Bailey, Terrance Williams,
-            # Tyler Johnson, Leonte Carroo) by 10% so true Year 1-3 underclassman dominance leads!
             senior_yr_discount=pl.when(pl.col("season") - pl.col("first_s") >= 3)
             .then(0.90)
+            .otherwise(1.0),
+            # Air-Raid Extreme Attempt Deflator (`air_raid_deflator`):
+            # Deflates offenses throwing >39 times per game (e.g. Washington St 53 att/g for Marquess Wilson,
+            # West Virginia 43 att/g for Stedman Bailey, Baylor/Texas Tech) without touching 30-37 att/g teams!
+            air_raid_deflator=pl.when(pl.col("team_pass_att_per_g") > 39.0)
+            .then(((39.0 / pl.col("team_pass_att_per_g")) ** 0.28).clip(0.86, 1.0))
             .otherwise(1.0),
         )
         .with_columns(
@@ -495,6 +504,7 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
                     * pl.col("qb_rescue_norm")
                     * pl.col("rec_vol_gate")
                     * pl.col("senior_yr_discount")
+                    * pl.col("air_raid_deflator")
                     * pl.col("s_games").cast(pl.Float64)
                     + prior_yptpa * 2.0
                 )
@@ -505,30 +515,28 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
                 + ((pl.col("eff_opp_elo") - 1530.0) / 600.0).clip(-0.34, 0.24)
                 - (pl.col("s_def_rating").fill_null(0.0) * 0.10).clip(-0.10, 0.14)
             ),
-            # Stronger Co-Star Teammate Multiplier for historic NFL WR rooms
-            # (2019 LSU Jefferson/Chase, 2021 Ohio State JSN/Wilson/Olave, 2019-2020 Alabama Jeudy/Smith/Waddle/Ruggs)
             teammate_mult=(
                 1.0
-                + (pl.col("co_star_yds_share") * 0.56).clip(0.0, 0.28)
-                + (pl.col("co_star_nfl_wrs") * 0.050)
+                + (pl.col("co_star_yds_share") * 0.54).clip(0.0, 0.27)
+                + (pl.col("co_star_nfl_wrs") * 0.048)
             ),
             alpha_dom_mult=(
                 1.0
-                + ((pl.col("pie_adj_dominator") - 0.32).clip(0.0, 0.30) * 0.50)
+                + ((pl.col("pie_adj_dominator") - 0.31).clip(0.0, 0.30) * 0.52)
                 * pl.col("sos_bonus_gate")
                 * pl.col("rec_vol_gate")
             ),
             chain_explosive_mult=(
                 1.0
-                + ((pl.col("yds_per_game") - 68.0) / 300.0).clip(-0.10, 0.15) * pl.col("sos_bonus_gate")
+                + ((pl.col("yds_per_game") - 68.0) / 290.0).clip(-0.10, 0.16) * pl.col("sos_bonus_gate")
                 + pl.when(pl.col("season_ypc") < 11.8)
                 .then((pl.col("season_ypc") - 11.8) * 0.050)
                 .when((pl.col("season_ypc") > 18.8) & (pl.col("raw_rec_per_game") < 4.8))
                 .then(-0.070)
-                .otherwise(((pl.col("season_ypc") - 13.5) / 46.0).clip(-0.04, 0.08))
-                + ((pl.col("td_per_game") - 0.55) / 8.5).clip(-0.04, 0.08) * pl.col("sos_bonus_gate")
+                .otherwise(((pl.col("season_ypc") - 13.5) / 46.0).clip(-0.04, 0.09))
+                + ((pl.col("td_per_game") - 0.55) / 8.0).clip(-0.04, 0.09) * pl.col("sos_bonus_gate")
             ),
-            s_room_credit=(pl.col("co_star_yds_share") * 1.35 + pl.col("co_star_nfl_wrs") * 0.14).clip(0.0, 0.72),
+            s_room_credit=(pl.col("co_star_yds_share") * 1.32 + pl.col("co_star_nfl_wrs") * 0.14).clip(0.0, 0.72),
             s_solo_alpha=(
                 (
                     (pl.col("eff_dominator") - 0.27).clip(0.0, 0.35) * 1.45
@@ -543,7 +551,7 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
                 (pl.col("s_games") >= 6)
                 & (pl.col("eff_opp_elo") >= 1510.0)
                 & (pl.col("raw_rec_per_game") >= 4.2)
-                & ((pl.col("pie_adj_dominator") >= 0.30) | (pl.col("yds_per_game") >= 74.0))
+                & ((pl.col("pie_adj_dominator") >= 0.29) | (pl.col("yds_per_game") >= 74.0))
             ).cast(pl.Int32),
         )
         .with_columns(
@@ -574,8 +582,7 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
             raw_yr1_dominator=pl.col("pie_adj_dominator").first(),
             yr1_rec=pl.col("s_rec").first(),
             yr1_yds=pl.col("s_yds").first(),
-            # Check if the receiver had an elite season (>= 950 yds or >= 2.55 M2) BEFORE their final year!
-            # This protects Sophomore Superstars who got injured as Juniors (Jaxon Smith-Njigba 2021, Ja'Marr Chase 2019)!
+            min_season_yds=pl.col("s_yds").min(),
             max_early_yds=pl.col("s_yds").slice(0, pl.len() - 1).max(),
             max_early_m2=pl.col("s_m2_rating").slice(0, pl.len() - 1).max(),
             career_rec=pl.col("s_rec").sum(),
@@ -637,6 +644,7 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
             final_rec_per_g=pl.col("rec_per_game").last(),
             final_yds_per_g=pl.col("yds_per_game").last(),
             final_ypc=pl.col("season_ypc").last(),
+            final_td=pl.col("s_td").last(),
             final_games_played=pl.col("s_games").last(),
             final_games_share=pl.col("eff_games_share").last(),
             max_co_star_wrs=pl.col("co_star_nfl_wrs").max(),
@@ -699,6 +707,7 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
         peak_yds_per_g=pl.col("peak_yds_per_g").fill_null(62.0),
         final_rec_per_g=pl.col("final_rec_per_g").fill_null(4.2),
         final_yds_per_g=pl.col("final_yds_per_g").fill_null(60.0),
+        final_td=pl.col("final_td").fill_null(5),
         final_games_played=pl.col("final_games_played").fill_null(11),
         final_games_share=pl.coalesce(["final_games_share", "leg_g_share"]).fill_null(0.85),
         max_co_star_wrs=pl.col("max_co_star_wrs").fill_null(0.0),
@@ -737,10 +746,6 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
         is_covid_optout_2021=(
             (pl.col("draft_year") == 2021) & (pl.col("last_season_panel") <= 2019)
         ),
-        # Early-Breakout Sophomore/Freshman Superstar Flag:
-        # True when a player posted an elite season (>= 1,100 yds or >= 2.75 M2 at >= 1545 Elo) BEFORE their final year
-        # AND shared the field with NFL co-stars (e.g. Jaxon Smith-Njigba's 1,606 yds in 2021 w/ Wilson & Olave,
-        # or Ja'Marr Chase's 1,780 yds in 2019 w/ Jefferson)!
         is_early_breakout_injured_star=(
             (pl.col("last_season_panel") < (pl.col("draft_year") - 1))
             & (pl.col("mean_opp_elo") >= 1545.0)
@@ -748,8 +753,6 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
             & ((pl.col("max_early_yds").fill_null(0) >= 1100) | (pl.col("m2_peak") >= 2.75))
         ),
     ).with_columns(
-        # `had_short_final_year` only penalizes players who missed their final season WITHOUT being
-        # an injured early-breakout Ohio St/LSU co-star superstar (penalizing Dez Bryant's 2009 NCAA suspension!)
         had_short_final_year=(
             (~pl.col("is_covid_optout_2021"))
             & (~pl.col("is_early_breakout_injured_star"))
@@ -758,10 +761,18 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
                 | (pl.col("last_season_panel") < (pl.col("draft_year") - 1))
             )
         ),
+        # If a 2-season redshirt freshman posted >= 1,050 yards in BOTH seasons against an SEC/B1G
+        # schedule (e.g. Mike Evans at Texas A&M: 1,105 yds in 2012 & 1,394 yds in 2013), give full 1.0x
+        # freshman weight instead of the 0.58x discount meant for declining 2-year players (Sidney Rice)!
         yr1_dominator=pl.when(pl.col("is_verified_freshman_season"))
         .then(
             pl.col("raw_yr1_dominator").fill_null(0.15)
-            * pl.when(pl.col("n_total_seasons") >= 3).then(1.0).otherwise(0.58)
+            * pl.when(
+                (pl.col("n_total_seasons") >= 3)
+                | ((pl.col("min_season_yds").fill_null(0) >= 1050) & (pl.col("mean_opp_elo") >= 1550.0))
+            )
+            .then(1.0)
+            .otherwise(0.58)
         )
         .when(pl.col("is_early_breakout_injured_star"))
         .then(0.32)
@@ -781,16 +792,15 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
             | (
                 (pl.col("final_games_share") <= 0.78)
                 & (pl.col("final_yds_per_g") >= 82.0)
+                # Require `m2_final >= m2_peak * 0.90` so players who regressed and quit mid-season
+                # (like Marquess Wilson in 2012 at Washington State) don't get injury protection!
+                & (pl.col("m2_final") >= pl.col("m2_peak") * 0.90)
             )
             | (
                 (pl.col("final_yds_per_g") >= 96.0)
                 & (pl.col("raw_peak_dominator") >= 0.38)
             )
         ),
-        # Final-Year-Only One-Year-Wonder Penalty:
-        # Hits players who ONLY produced in 1 starter season (`active_starter_seasons <= 1` and NOT an
-        # early-breakout injured star like JSN or 2020 COVID opt-out like Chase), such as Devin Thomas (2008)
-        # or 1-year 2026 breakouts (KJ Duff)!
         one_year_wonder_pen=pl.when(
             (pl.col("active_starter_seasons") <= 1)
             & (~pl.col("is_covid_optout_2021"))
@@ -808,7 +818,7 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
                 | pl.col("is_early_breakout_injured_star")
                 | (pl.col("is_covid_optout_2021") & (pl.col("m2_peak") >= 2.70))
             )
-            .then(0.16)
+            .then(0.17)
             .otherwise(0.0)
         ),
     ).with_columns(
@@ -820,9 +830,10 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
         )
         .then(
             (
-                (pl.col("m2_final") - pl.col("m2_career")).clip(0.0, 0.45) * 0.28
+                (pl.col("m2_final") - pl.col("m2_career")).clip(0.0, 0.45) * 0.30
                 + ((pl.col("final_yds_per_g") - 80.0).clip(0.0, 50.0) / 100.0) * 0.28
-            ).clip(0.0, 0.24)
+                + ((pl.col("final_td").cast(pl.Float64) - 10.0).clip(0.0, 10.0) / 10.0) * 0.08
+            ).clip(0.0, 0.26)
         )
         .otherwise(0.0),
         final_regression_pen=pl.when(
@@ -832,7 +843,7 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
         .when(
             (~pl.col("is_optout_or_injured_final")) & (pl.col("m2_final") < pl.col("m2_peak") * 0.93)
         )
-        .then((pl.col("m2_peak") - pl.col("m2_final")) * 0.78)
+        .then((pl.col("m2_peak") - pl.col("m2_final")) * 0.82)
         .when(
             (pl.col("n_total_seasons") >= 3)
             & (~pl.col("is_covid_optout_2021"))
@@ -846,7 +857,7 @@ def build_new_m2_college_ratings(links_df: pl.DataFrame) -> pl.DataFrame:
         m2_final_eff=(
             pl.when(pl.col("is_optout_or_injured_final"))
             .then(0.85 * pl.col("m2_peak") + 0.15 * pl.col("m2_final"))
-            .otherwise(0.75 * pl.col("m2_final") + 0.25 * pl.col("m2_peak"))
+            .otherwise(0.76 * pl.col("m2_final") + 0.24 * pl.col("m2_peak"))
             + pl.col("ascension_bonus")
             + pl.col("sustained_alpha_bonus") * 0.75
             - pl.col("one_year_wonder_pen")
