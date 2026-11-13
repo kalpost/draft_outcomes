@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-NFL WR Prospect Translation Board & Interactive Lineup / Monte Carlo Lab (`build_rankings_app.py`)
-==================================================================================================
+Boom or Bust — NFL WR Prospect Translation Board & Interactive Lineup / Monte Carlo Lab (`build_rankings_app.py`)
+=================================================================================================================
 Reads output parquets written by `run_unified_pipeline.py` and emits a self-contained,
-zero-dependency HTML application (`prospect_rankings_app.html`) with a minimalist
-**Black / White / Gray / Gold** design system (team colors reserved strictly for NFL team badges):
+zero-dependency HTML application (`prospect_rankings_app.html`) branded as **Boom or Bust**
+with a minimalist **Black / White / Gray / Gold** design system (team colors reserved
+strictly for NFL team badges):
 
   Tab 1 — Prospect Rankings Board:
     - Minimalist high-contrast Black (`#09090b`), Zinc Gray (`#18181b`), Crisp White (`#fafafa`),
@@ -13,15 +14,17 @@ zero-dependency HTML application (`prospect_rankings_app.html`) with a minimalis
       shown **relative to Team-Neutral Base (`n_hit`)** whenever Drafted-Team Fit or a Mock
       landing spot is active.
     - Quick Team-Fit Drawer: compares Team-Neutral Base vs. Drafted vs. What-If with all yardage
-      deltas calculated strictly **vs. Team-Neutral Base** (fixing the previous bug where deltas
-      were calculated relative to the drafted team).
+      deltas calculated strictly **vs. Team-Neutral Base**.
 
   Tab 2 — Front-Office Lineup Lab & Rookie Contract Sim Game:
+    - **Clean Instant Search + Interactive Prospect Picker List** (replacing the cluttered dropdown):
+      * Search by receiver name, college, draft year, or NFL team with instant filtering,
+        keyboard navigation (`Up`/`Down`/`Enter`), and a sleek scrollable prospect list showing
+        each receiver's Grade, Class, College, and Archetype.
     - Interactive **Madden-Style 11-Personnel Offensive Lineup**:
       * Places the selected prospect directly into the team's actual starting offense (`QB1`,
         `WR1 (Boundary X)`, `WR2 (Flanker Z)`, `WR3 (Slot)`, `TE1`, plus `Bench / WR4`) alongside
-        the real NFL players who played for that team in that season (with their real yards,
-        receptions, targets, and target shares from `nfl_stats_player.parquet`).
+        the real NFL players who played for that team in that season.
       * **Interactive GM Roster Moves**: Click any returning WR/TE card in the lineup to
         **Trade / Bench** them (vacating their targets into the offense in real time!), or toggle
         the **QB Tier Override** (`Actual QB` / `Elite All-Pro QB` / `Bridge QB`) and watch the
@@ -29,9 +32,7 @@ zero-dependency HTML application (`prospect_rankings_app.html`) with a minimalis
     - **Rookie Contract Career Roller & 1,000-Trial Monte Carlo Distribution**:
       * Simulates 1,000 careers in real time (Gray = Bust `<500`, White = Starter `500–2,499`,
         Gold = Boom `>=2,500`) and lets you roll individual 3-year rookie contracts with a
-        percentile marker, Year 1–3 stat lines, a **Year-4 Front-Office Contract Verdict**
-        (`Supermax WR1 Extension`, `5th-Year Option`, `Bridge Deal`, or `Cut`), and a live
-        Roll History strip.
+        percentile marker, Year 1–3 stat lines, and a **Year-4 Front-Office Contract Verdict**.
 """
 
 from __future__ import annotations
@@ -456,7 +457,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WR Prospect Translation Board &amp; Lineup Lab</title>
+<title>Boom or Bust &mdash; NFL WR Prospect Translation &amp; Lineup Lab</title>
 <style>
 :root{
   /* Strict Minimalist Black, White, Gray, & Gold Palette */
@@ -483,8 +484,8 @@ body{margin:0;background:var(--bg);color:var(--txt);font:13.5px/1.45 -apple-syst
 header{position:sticky;top:0;z-index:30;background:rgba(9,9,11,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
 header .wrap{height:60px;display:flex;align-items:center;justify-content:space-between;gap:16px}
 .brand{display:flex;align-items:center;gap:12px}
-.logo{width:30px;height:30px;border-radius:6px;background:var(--gold);color:#09090b;display:grid;place-items:center;font-weight:900;font-size:11px;letter-spacing:-.02em}
-.brand b{font-size:14px;letter-spacing:.01em;text-transform:uppercase}.brand small{display:block;color:var(--dim);font-size:11px;margin-top:1px}
+.logo{width:32px;height:32px;border-radius:6px;background:var(--gold);color:#09090b;display:grid;place-items:center;font-weight:900;font-size:11px;letter-spacing:-.03em}
+.brand b{font-size:15px;letter-spacing:.03em;text-transform:uppercase;color:var(--txt)}.brand small{display:block;color:var(--dim);font-size:11px;margin-top:1px}
 .nav-tabs{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:3px;gap:3px}
 .nav-tabs button{background:none;border:0;border-radius:5px;padding:6px 14px;font-size:12px;font-weight:600;color:var(--mut);cursor:pointer;transition:all .12s}
 .nav-tabs button:hover{color:var(--txt)}
@@ -575,14 +576,36 @@ footer{color:var(--dim);font-size:11px;padding:18px 0 60px;border-top:1px solid 
 
 /* ---- Tab 2: Front-Office Lineup Lab & Career Sim Game ---- */
 #tab-sim{display:none;padding:20px 0 60px}
-.sim-layout{display:grid;grid-template-columns:310px minmax(0,1fr);gap:20px;align-items:start}
+.sim-layout{display:grid;grid-template-columns:320px minmax(0,1fr);gap:20px;align-items:start}
 .sim-card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px}
 .sim-card h3{margin:0 0 12px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);font-weight:800}
-.sim-field{margin-bottom:12px}
-.sim-field label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:5px;font-weight:700}
+.sim-field{margin-bottom:13px}
+.sim-field label{display:flex;justify-content:space-between;align-items:center;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:6px;font-weight:700}
 .sim-field select{width:100%;padding:7px 9px;font-size:12.5px;background:var(--surface2)}
 .quick-row{display:flex;gap:5px;margin-top:8px}
 .quick-row button{flex:1;padding:5px 6px;font-size:11px}
+
+/* Clean Instant Search + Scrollable Prospect Picker List in Tab 2 */
+.search-box{position:relative;display:flex;gap:6px;margin-bottom:7px}
+.search-box input[type=text]{flex:1;width:100%;background:var(--bg);border:1px solid var(--line-hi);border-radius:6px;padding:7px 26px 7px 10px;font-size:12.5px;color:var(--txt)}
+.search-box input[type=text]:focus{border-color:var(--gold)}
+.search-clear{position:absolute;right:78px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--dim);cursor:pointer;font-size:14px;padding:0 4px;display:none}
+.search-clear:hover{color:var(--txt)}
+.search-cls-sel{width:70px!important;padding:6px 6px!important;font-size:11.5px!important;background:var(--bg)!important;border-color:var(--line-hi)!important;flex-shrink:0}
+
+.p-list{max-height:215px;overflow-y:auto;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:3px;display:flex;flex-direction:column;gap:2px}
+.p-list::-webkit-scrollbar{width:5px}
+.p-list::-webkit-scrollbar-thumb{background:var(--line-hi);border-radius:3px}
+.p-item{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:4px;cursor:pointer;border:1px solid transparent;transition:all .1s}
+.p-item:hover{background:var(--surface2);border-color:var(--line)}
+.p-item.on{background:var(--gold-bg);border-color:var(--gold)}
+.p-item-l{min-width:0;flex:1}
+.p-item-nm{font-weight:700;font-size:12.5px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p-item.on .p-item-nm{color:var(--gold)}
+.p-item-sub{font-size:10.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p-item-r{display:flex;align-items:center;gap:5px;margin-left:8px;flex-shrink:0}
+.p-item-grd{font-size:11.5px;font-weight:800;color:var(--txt);padding:1px 5px;border-radius:3px;background:var(--surface2);border:1px solid var(--line)}
+.p-item.on .p-item-grd{background:var(--gold);color:#09090b;border-color:var(--gold)}
 
 /* Madden-Style 11-Personnel Tactical Formation Grid */
 .field-board{margin-top:14px;background:radial-gradient(circle at 50% 0%,rgba(212,175,55,.06),transparent 70%),repeating-linear-gradient(0deg,var(--bg) 0px,var(--bg) 38px,rgba(255,255,255,.025) 39px);border:1px solid var(--line-hi);border-radius:8px;padding:16px;position:relative}
@@ -643,8 +666,8 @@ footer{color:var(--dim);font-size:11px;padding:18px 0 60px;border-top:1px solid 
 <body>
 <header><div class="wrap">
   <div class="brand">
-    <div class="logo">WR</div>
-    <div><b>WR Prospect Translation Board</b><small><span id="yr-span"></span> classes &middot; zero draft-capital bias</small></div>
+    <div class="logo">B/B</div>
+    <div><b>Boom or Bust</b><small>NFL WR Prospect Translation &amp; Lineup Lab &middot; <span id="yr-span"></span> classes &middot; zero draft-capital bias</small></div>
   </div>
   <div class="nav-tabs" id="nav-tabs">
     <button data-tab="board" class="on">1. Prospect Rankings Board</button>
@@ -694,7 +717,7 @@ footer{color:var(--dim);font-size:11px;padding:18px 0 60px;border-top:1px solid 
   <main id="rows"></main>
   <div id="empty">No prospects match your current filter.</div>
   <footer>
-    <b>Base vs. Landing-Spot Framing:</b> Every team-fit shift (`+ / - yds vs Base`) is measured strictly against the prospect's <b>Team-Neutral Base (Stage 1.5)</b> expectation, isolating the exact impact of QB efficiency, pass volume, vacated targets, and WR room role overlap. For completed classes through <span id="lastdone"></span>, the circular dot marks actual 3-year NFL receiving yards (white = inside p10&ndash;p90, gray = outside).
+    <b>Boom or Bust &mdash; Base vs. Landing-Spot Framing:</b> Every team-fit shift (`+ / - yds vs Base`) is measured strictly against the prospect's <b>Team-Neutral Base (Stage 1.5)</b> expectation, isolating the exact impact of QB efficiency, pass volume, vacated targets, and WR room role overlap. For completed classes through <span id="lastdone"></span>, the circular dot marks actual 3-year NFL receiving yards (white = inside p10&ndash;p90, gray = outside).
   </footer>
 </div>
 
@@ -703,23 +726,28 @@ footer{color:var(--dim);font-size:11px;padding:18px 0 60px;border-top:1px solid 
 <!-- ====================================================================== -->
 <div class="wrap" id="tab-sim">
   <div class="sim-layout">
-    <!-- Left Column: GM Controls -->
+    <!-- Left Column: GM Controls with Clean Search + Scrollable List -->
     <div class="sim-card">
-      <h3>Front-Office Controls</h3>
+      <h3>Boom or Bust &middot; GM Controls</h3>
       <div class="sim-field">
-        <label>1. Draft Class Filter</label>
-        <select id="sim-cls-filter"></select>
+        <label>
+          <span>1. Search &amp; Select WR Prospect</span>
+          <span id="sim-match-cnt" class="mono" style="color:var(--dim);font-weight:500"></span>
+        </label>
+        <div class="search-box">
+          <input id="sim-search" type="text" placeholder="Type name, college, or year..." autocomplete="off">
+          <button id="sim-search-clear" class="search-clear" title="Clear search">&times;</button>
+          <select id="sim-cls-filter" class="search-cls-sel" title="Filter by Draft Class"></select>
+        </div>
+        <div class="p-list" id="sim-prospect-list"></div>
       </div>
+
       <div class="sim-field">
-        <label>2. Select WR Prospect</label>
-        <select id="sim-prospect"></select>
-      </div>
-      <div class="sim-field">
-        <label>3. NFL Roster Season</label>
+        <label><span>2. NFL Roster Season</span></label>
         <select id="sim-env-year"></select>
       </div>
       <div class="sim-field">
-        <label>4. Select NFL Team (32 Franchises)</label>
+        <label><span>3. Select NFL Team (32 Franchises)</span></label>
         <div class="teams" id="sim-teams-grid"></div>
         <div class="quick-row">
           <button class="btn" id="sim-btn-best" title="Find team with highest positive gain over Base">Best Fit</button>
@@ -728,7 +756,7 @@ footer{color:var(--dim);font-size:11px;padding:18px 0 60px;border-top:1px solid 
         </div>
       </div>
       <div class="sim-field" style="border-top:1px solid var(--line);padding-top:12px;margin-top:12px">
-        <label>5. Prospect Alignment Override</label>
+        <label><span>4. Prospect Alignment Override</span></label>
         <div class="seg" id="sim-role-seg" style="width:100%">
           <button data-role="auto" class="on" style="flex:1">Auto</button>
           <button data-role="Boundary X" style="flex:1">X</button>
@@ -781,6 +809,7 @@ const st = {
   sel: P[0] || null,
   preview: (P[0] && P[0].team) ? P[0].team : 'KC',
   simCls: 'all',
+  simQ: '',
   simProspectId: P[0] ? P[0].id : 'p0',
   simTeam: (P[0] && P[0].team) ? P[0].team : 'KC',
   simYear: P[0] ? P[0].year : 2025,
@@ -838,7 +867,6 @@ function mockFit(p, code, envYear, opts) {
     proe: 0.0, qb_epa: 0.0, vacated: 0.24, style: 'Balanced Pro-Style', incumbents: [], departed: []
   };
 
-  // Optional Role Override & Interactive Benched/Traded Veterans
   let rVec = [p.px, p.pz, p.ps];
   let activeArch = p.arch;
   if (options.roleOverride && options.roleOverride !== 'auto') {
@@ -940,7 +968,6 @@ function mockFit(p, code, envYear, opts) {
 function buildStartingLineup(p, m) {
   const env = m.team;
   const allIncs = env.incumbents || [];
-  // Estimate prospect's rookie-contract average target share from their `hit` projection
   const estProjShare = clip((m.hit / 3.0) / Math.max(env.qb_yds || 3600, 2900) * 0.92, 0.12, 0.31);
   const prospectNode = {
     isProspect: true,
@@ -974,11 +1001,9 @@ function buildStartingLineup(p, m) {
       : { isProspect: false, name: 'Starting TE', pos: 'TE', arch: 'Inline TE', ovr: 74, target_share: 0.12, yds: 520, rec: 46, benched: false, synthetic: true };
   }
 
-  // Sort active WRs by target_share / OVR to assign WR1, WR2, WR3, and Bench
   const activeWrs = wrPool.filter(w => !w.benched).sort((a, b) => (b.target_share - a.target_share) || (b.ovr - a.ovr));
   const benchedWrs = wrPool.filter(w => w.benched);
 
-  // Normalize target shares among active pass-catchers so user sees realistic share redistribution
   const rawSum = activeWrs.slice(0, 3).reduce((s, w) => s + w.target_share, 0) + (te1Node.benched ? 0 : te1Node.target_share);
   const scale = rawSum > 0.78 ? (0.76 / rawSum) : 1.0;
 
@@ -1021,7 +1046,6 @@ function rollSingleCareer(p, m) {
   const s10 = Math.sqrt(Math.max(0, m.p10)), s50 = Math.sqrt(Math.max(25, m.p50)), s90 = Math.sqrt(Math.max(100, m.p90));
   const totYds = drawSqrtSplitNormal(s10, s50, s90);
 
-  // Compute exact percentile of this roll on the prospect's split-normal curve
   const sy = Math.sqrt(Math.max(0, totYds));
   const sl = Math.max(3, (s50 - s10) / 1.38), sr = Math.max(3.8, (s90 - s50) / 1.38);
   const z = (sy - s50) / (sy < s50 ? sl : sr);
@@ -1185,7 +1209,6 @@ function renderBoard() {
     const tags = (p.no40 ? '<span class="tag" title="No 40-yard dash on record">No 40</span>' : '') +
       (p.mock_fit ? '<span class="tag gold">Pinned: ' + esc(p.mock_fit.code) + ' \'' + String(p.mock_fit.envYear).slice(-2) + '</span>' : '');
 
-    // Delta strictly relative to Team-Neutral Base (`p.n_hit`)
     const deltaBase = e.hit - p.n_hit;
     const deltaHtml = (st.view === 'neutral' && !p.mock_fit)
       ? '<small>Base Neutral</small>'
@@ -1221,7 +1244,6 @@ function renderDrawer() {
   const drafted = { p10: p.s_p10, p50: p.s_p50, p90: p.s_p90, hit: p.s_hit, miss: p.s_miss, starter: p.s_st, boom: p.s_bm, bust: p.s_bu };
   const shiftCls = v => (v >= 0 ? 'pos' : 'neg');
 
-  // FIXED: Delta is strictly What-If vs. Team-Neutral Base (`m.hit - neutral.hit`)!
   const mockVsBase = m.hit - neutral.hit;
   const draftedVsBase = drafted.hit - neutral.hit;
   const incNames = (m.team.incumbents || []).slice(0, 3).map(i => i.name + ' (' + Math.round(i.target_share*100) + '%)').join(', ');
@@ -1237,7 +1259,7 @@ function renderDrawer() {
     '<div class="cell"><small>Burst</small><b class="mono">' + (p.burst == null ? '–' : p.burst.toFixed(0)) + '</b></div></div>';
 
   $('drawer-body').innerHTML =
-    '<div class="dh"><div><span class="lbl">Prospect Overview</span><h2>' + esc(p.name) + '</h2>' +
+    '<div class="dh"><div><span class="lbl">Boom or Bust &middot; Prospect Overview</span><h2>' + esc(p.name) + '</h2>' +
     '<div class="sub">' + esc(p.college) + ' &middot; Class of ' + p.year + ((p.pick && p.pick < 500) ? ' &middot; Rd ' + p.round + ' #' + p.pick : ' &middot; Pre-Draft') + (p.team ? ' &middot; ' + esc(p.team) : '') + '</div>' +
     '<div style="margin-top:6px"><span class="tag" style="margin-left:0">' + esc(p.arch) + '</span><span class="tag gold">Grade ' + p.grade.toFixed(1) + '</span></div></div>' +
     '<button class="btn" id="btn-close" style="align-self:flex-start">&times;</button></div>' +
@@ -1282,20 +1304,84 @@ function closeDrawer() {
   $('backdrop').style.display = 'none';
 }
 
-// ---- Tab 2: Front-Office Lineup Lab & Rookie Contract Sim Game ---------------
+// ---- Tab 2: Clean Search + Scrollable Prospect Picker & Lineup Lab ----------
+function getFilteredSimProspects() {
+  const q = (st.simQ || '').toLowerCase().trim();
+  return P.filter(p => {
+    if (st.simCls !== 'all' && String(p.year) !== st.simCls) return false;
+    if (!q) return true;
+    return (
+      p.name.toLowerCase().includes(q) ||
+      String(p.college).toLowerCase().includes(q) ||
+      String(p.year).includes(q) ||
+      String(p.team).toLowerCase().includes(q)
+    );
+  });
+}
+
+function selectSimProspect(id, scrollIntoView) {
+  const p = P.find(x => x.id === id);
+  if (!p) return;
+  st.simProspectId = p.id;
+  st.simTeam = p.mock_fit ? p.mock_fit.code : (p.team || 'KC');
+  st.simYear = p.mock_fit ? p.mock_fit.envYear : p.year;
+  st.benchedVets = {};
+  st.simRoleOverride = 'auto';
+  st.simQbMode = 'actual';
+  st.singleRoll = null;
+  st.rollHistory = [];
+  $('sim-env-year').value = String(st.simYear);
+  document.querySelectorAll('#sim-role-seg button').forEach(b => b.classList.toggle('on', b.dataset.role === st.simRoleOverride));
+  renderSimProspectList(scrollIntoView);
+  renderSimTab();
+}
+
+function renderSimProspectList(scrollSelected) {
+  const matches = getFilteredSimProspects();
+  const activeP = P.find(x => x.id === st.simProspectId) || P[0];
+  $('sim-match-cnt').textContent = matches.length + ' found';
+  $('sim-search-clear').style.display = st.simQ ? 'block' : 'none';
+
+  // Always ensure currently selected prospect is visible or show top 60 matches
+  const shown = matches.slice(0, 60);
+  if (activeP && !shown.some(x => x.id === activeP.id) && !st.simQ && st.simCls === 'all') {
+    shown.unshift(activeP);
+  }
+
+  if (!shown.length) {
+    $('sim-prospect-list').innerHTML = '<div style="padding:18px 8px;text-align:center;color:var(--dim);font-size:11.5px">No receivers match "' + esc(st.simQ) + '"</div>';
+    return;
+  }
+
+  const shortArch = a => (a === 'Boundary X' ? 'X' : (a === 'Flanker Z' ? 'Z' : 'SL'));
+
+  $('sim-prospect-list').innerHTML = shown.map(p => {
+    const isOn = p.id === st.simProspectId;
+    return '<div class="p-item' + (isOn ? ' on' : '') + '" data-pid="' + p.id + '">' +
+      '<div class="p-item-l">' +
+        '<div class="p-item-nm">' + esc(p.name) + '</div>' +
+        '<div class="p-item-sub">' + esc(p.college) + ' &middot; ' + p.year + (p.team ? ' &middot; ' + esc(p.team) : '') + '</div>' +
+      '</div>' +
+      '<div class="p-item-r">' +
+        '<span class="tag" style="margin:0;padding:0 5px">' + shortArch(p.arch) + '</span>' +
+        '<span class="p-item-grd mono">' + p.grade.toFixed(1) + '</span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  if (scrollSelected) {
+    const activeEl = $('sim-prospect-list').querySelector('.p-item.on');
+    if (activeEl) activeEl.scrollIntoView({ block: 'nearest' });
+  }
+}
+
 function populateSimSelectors() {
   const years = ['all'].concat(META.years.map(String));
-  $('sim-cls-filter').innerHTML = years.map(y => '<option value="' + y + '"' + (y === st.simCls ? ' selected' : '') + '>' + (y === 'all' ? 'All Classes (' + META.years[META.years.length-1] + '–' + META.years[0] + ')' : 'Class of ' + y) + '</option>').join('');
-
-  const filtered = P.filter(p => st.simCls === 'all' || String(p.year) === st.simCls);
-  if (!filtered.some(p => p.id === st.simProspectId) && filtered.length) {
-    st.simProspectId = filtered[0].id;
-    st.simTeam = filtered[0].team || 'KC';
-    st.simYear = filtered[0].year;
-  }
-  $('sim-prospect').innerHTML = filtered.map(p => '<option value="' + p.id + '"' + (p.id === st.simProspectId ? ' selected' : '') + '>' + esc(p.name) + ' (' + p.year + ' · ' + esc(p.college) + ' · Grd ' + p.grade.toFixed(1) + ')</option>').join('');
+  $('sim-cls-filter').innerHTML = years.map(y => '<option value="' + y + '"' + (y === st.simCls ? ' selected' : '') + '>' + (y === 'all' ? 'All Yrs' : y) + '</option>').join('');
   $('sim-env-year').innerHTML = META.years.map(y => '<option value="' + y + '"' + (y === st.simYear ? ' selected' : '') + '>' + y + ' NFL Roster &amp; Environment</option>').join('');
+  $('sim-search').value = st.simQ;
   document.querySelectorAll('#sim-role-seg button').forEach(b => b.classList.toggle('on', b.dataset.role === st.simRoleOverride));
+  renderSimProspectList(true);
 }
 
 function renderSimTab() {
@@ -1309,13 +1395,11 @@ function renderSimTab() {
   });
   const shiftCls = v => (v >= 0 ? 'pos' : 'neg');
 
-  // Render 32-team selector grid (only place with NFL team colors)
   $('sim-teams-grid').innerHTML = TEAM_CODES.map(c => {
     const col = (ENVS[c + '_' + st.simYear] || {}).color || '#3f3f46';
     return '<button class="tb' + (c === st.simTeam ? ' on' : '') + '" data-simteam="' + c + '" style="background:' + col + ';color:' + ink(col) + '">' + c + '</button>';
   }).join('');
 
-  // Build 11-Personnel Starting Lineup with Prospect Inserted
   const lineup = buildStartingLineup(p, m);
   const lineupCardsHtml = lineup.slots.map(s => {
     const pl = s.player;
@@ -1351,7 +1435,6 @@ function renderSimTab() {
     '</div>';
   }).join('');
 
-  // Bench / Bumped-Down / Traded Strip
   const benchHtml = lineup.benchList.length
     ? '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
         '<span class="lbl" style="margin-right:4px">WR4 / Bench / Traded:</span>' +
@@ -1363,7 +1446,6 @@ function renderSimTab() {
       '</div>'
     : '';
 
-  // Run live 1,000-trial Monte Carlo simulation in browser
   const mc = runMonteCarlo1000(m);
   const maxBin = Math.max(1, ...mc.bins);
   const binLabels = ['<500', '500–999', '1.0–1.5k', '1.5–2.0k', '2.0–2.5k', '2.5–3.0k', '3.0–3.5k', '3.5–4.0k', '4.0–4.5k', '4.5k+'];
@@ -1390,7 +1472,7 @@ function renderSimTab() {
         '<div>' +
           '<div style="display:flex;align-items:center;gap:8px">' +
             '<span class="tm-badge" style="background:' + tmCol + ';color:' + ink(tmCol) + ';padding:2px 8px;font-size:11px">' + esc(m.code) + ' ' + st.simYear + '</span>' +
-            '<span class="lbl">Front-Office Lineup &amp; Career Sim Lab</span>' +
+            '<span class="lbl">Boom or Bust &middot; Lineup &amp; Career Sim Lab</span>' +
           '</div>' +
           '<h2 style="margin:5px 0 2px;font-size:22px;font-weight:800">' + esc(p.name) + ' &rarr; ' + esc(m.team.city) + ' ' + esc(m.team.name) + '</h2>' +
           '<div class="sub">' + esc(p.college) + ' &middot; Grade <b>' + p.grade.toFixed(1) + '</b> &middot; Base "If Hits": <b class="mono">' + fmt(p.n_hit) + ' yds</b> (' + fmt(p.n_p10) + '&ndash;' + fmt(p.n_p90) + ')</div>' +
@@ -1441,7 +1523,7 @@ function renderSimTab() {
       '<div class="career-box">' +
         '<div class="career-hdr">' +
           '<div>' +
-            '<span class="lbl">Rookie Contract Sim Game (Years 1&ndash;3)</span>' +
+            '<span class="lbl">Boom or Bust &middot; Rookie Contract Sim Game (Years 1&ndash;3)</span>' +
             '<div style="font-weight:800;font-size:16px;margin-top:2px">' + esc(p.name) + ' &mdash; Simulated 3-Year Outcome on ' + esc(m.code) + ' <span class="tag gold">' + sr.pctile + 'th Percentile Roll</span></div>' +
           '</div>' +
           '<div style="display:flex;gap:6px;align-items:center">' +
@@ -1526,6 +1608,7 @@ $('drawer-body').addEventListener('click', e => {
   if (e.target.closest('#btn-clear-mock')) { st.sel.mock_fit = null; closeDrawer(); renderBoard(); return; }
   if (e.target.closest('#btn-open-sim')) {
     st.simCls = 'all';
+    st.simQ = '';
     st.simProspectId = st.sel.id;
     st.simTeam = st.preview;
     st.simYear = st.sel.year;
@@ -1539,30 +1622,50 @@ $('drawer-body').addEventListener('click', e => {
   }
 });
 
-// Tab 2 Simulator Events
+// Tab 2 Search + Scrollable Prospect List Events
+$('sim-search').addEventListener('input', e => {
+  st.simQ = e.target.value;
+  renderSimProspectList(false);
+});
+$('sim-search').addEventListener('keydown', e => {
+  const matches = getFilteredSimProspects();
+  if (!matches.length) return;
+  const curIdx = matches.findIndex(x => x.id === st.simProspectId);
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    const next = matches[Math.min(matches.length - 1, curIdx + 1)] || matches[0];
+    selectSimProspect(next.id, true);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    const prev = matches[Math.max(0, curIdx - 1)] || matches[0];
+    selectSimProspect(prev.id, true);
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    const pick = curIdx >= 0 ? matches[curIdx] : matches[0];
+    selectSimProspect(pick.id, true);
+  }
+});
+$('sim-search-clear').addEventListener('click', () => {
+  st.simQ = '';
+  $('sim-search').value = '';
+  renderSimProspectList(true);
+  $('sim-search').focus();
+});
 $('sim-cls-filter').addEventListener('change', e => {
   st.simCls = e.target.value;
-  st.benchedVets = {};
-  st.singleRoll = null;
-  st.rollHistory = [];
-  populateSimSelectors();
-  renderSimTab();
-});
-$('sim-prospect').addEventListener('change', e => {
-  st.simProspectId = e.target.value;
-  const p = P.find(x => x.id === st.simProspectId);
-  if (p) {
-    st.simTeam = p.mock_fit ? p.mock_fit.code : (p.team || 'KC');
-    st.simYear = p.mock_fit ? p.mock_fit.envYear : p.year;
+  const matches = getFilteredSimProspects();
+  if (matches.length && !matches.some(x => x.id === st.simProspectId)) {
+    selectSimProspect(matches[0].id, true);
+  } else {
+    renderSimProspectList(true);
   }
-  st.benchedVets = {};
-  st.simRoleOverride = 'auto';
-  st.simQbMode = 'actual';
-  st.singleRoll = null;
-  st.rollHistory = [];
-  populateSimSelectors();
-  renderSimTab();
 });
+$('sim-prospect-list').addEventListener('click', e => {
+  const item = e.target.closest('[data-pid]');
+  if (!item) return;
+  selectSimProspect(item.dataset.pid, false);
+});
+
 $('sim-env-year').addEventListener('change', e => {
   st.simYear = parseInt(e.target.value, 10);
   st.benchedVets = {};
@@ -1580,7 +1683,7 @@ $('sim-teams-grid').addEventListener('click', e => {
 $('sim-role-seg').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   st.simRoleOverride = b.dataset.role;
-  populateSimSelectors();
+  document.querySelectorAll('#sim-role-seg button').forEach(btn => btn.classList.toggle('on', btn.dataset.role === st.simRoleOverride));
   st.singleRoll = null;
   renderSimTab();
 });
@@ -1606,15 +1709,8 @@ $('sim-btn-drafted').addEventListener('click', () => {
   st.simRoleOverride = 'auto';
   st.simQbMode = 'actual';
   st.singleRoll = null;
-  populateSimSelectors();
-  renderSimTab();
-});
-$('sim-btn-reset-room').addEventListener('click', () => {
-  st.benchedVets = {};
-  st.simRoleOverride = 'auto';
-  st.simQbMode = 'actual';
-  st.singleRoll = null;
-  populateSimSelectors();
+  $('sim-env-year').value = String(st.simYear);
+  document.querySelectorAll('#sim-role-seg button').forEach(b => b.classList.toggle('on', b.dataset.role === 'auto'));
   renderSimTab();
 });
 $('sim-btn-pin').addEventListener('click', () => {
@@ -1626,11 +1722,18 @@ $('sim-btn-pin').addEventListener('click', () => {
   });
   switchTab('board');
 });
+$('sim-btn-reset-room').addEventListener('click', () => {
+  st.benchedVets = {};
+  st.simQbMode = 'actual';
+  st.singleRoll = null;
+  renderSimTab();
+});
 
+// Interactive Roster Moves & Career Roller Inside Main Sim Panel
 $('sim-main-panel').addEventListener('click', e => {
-  const p = P.find(x => x.id === st.simProspectId); if (!p) return;
+  const p = P.find(x => x.id === st.simProspectId) || P[0];
+  if (!p) return;
 
-  // Interactive Veteran Trade / Bench Toggle
   const vetCard = e.target.closest('[data-vet]');
   if (vetCard) {
     const vName = vetCard.dataset.vet;
@@ -1641,7 +1744,6 @@ $('sim-main-panel').addEventListener('click', e => {
     return;
   }
 
-  // Interactive QB Mode Override
   const qbBtn = e.target.closest('[data-qb]');
   if (qbBtn) {
     st.simQbMode = qbBtn.dataset.qb;
@@ -1720,14 +1822,14 @@ def build_rankings_app(
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8")
     print(
-        f"Generated dynamic 2-tab board with {len(prospects)} prospects across classes "
+        f"Generated Boom or Bust 2-tab board with {len(prospects)} prospects across classes "
         f"{years[-1]}–{years[0]} -> {out.resolve()} ({out.stat().st_size / 1024:.0f} KB)"
     )
     return out
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Build the dynamic year-specific WR prospect board HTML app.")
+    ap = argparse.ArgumentParser(description="Build the Boom or Bust NFL WR prospect board & lineup lab HTML app.")
     ap.add_argument("--data-dir", help="Directory containing the pipeline's output parquets")
     ap.add_argument("--out", default=str(ROOT_DIR / "prospect_rankings_app.html"), help="Output HTML path")
     ap.add_argument(
